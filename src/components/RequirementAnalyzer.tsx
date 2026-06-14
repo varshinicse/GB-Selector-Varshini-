@@ -215,26 +215,6 @@ export const RequirementAnalyzer: React.FC<RequirementAnalyzerProps> = ({ onAuto
       if (onReportsReady) {
         onReportsReady(solution, verification, solution.projectName);
       }
-
-      // Auto-fill the form when there are no critical failures
-      if (verification.criticalFailures.length === 0) {
-        onAutoFill({
-          projectName: solution.projectName,
-          powerKW: solution.powerKW.value,
-          inputRPM: solution.inputRPM.value,
-          totalRatio: solution.totalRatio.value,
-          serviceFactor: solution.serviceFactor.value,
-          stages: solution.stages.value,
-        });
-
-        // Smoothly scroll to the Operating & Design Parameters section
-        setTimeout(() => {
-          const paramsSection = document.getElementById('parameters-section');
-          if (paramsSection) {
-            paramsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }, 100);
-      }
     } catch (error) {
       console.error(error);
       const errMsg = error instanceof Error ? error.message : String(error);
@@ -283,6 +263,14 @@ export const RequirementAnalyzer: React.FC<RequirementAnalyzerProps> = ({ onAuto
       }
       
       onAutoFill(valuesToFill);
+
+      // Smoothly scroll to the Operating & Design Parameters section
+      setTimeout(() => {
+        const paramsSection = document.getElementById('parameters-section');
+        if (paramsSection) {
+          paramsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
     }
   };
 
