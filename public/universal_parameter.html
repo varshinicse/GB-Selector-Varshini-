@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal Parameter Resolution Framework — MAGTORQ</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-bg-primary: #0f172a;
+            --color-bg-secondary: #1e293b;
+            --color-bg-tertiary: #334155;
+            --color-border-primary: #38bdf8;
+            --color-border-secondary: #475569;
+            --color-border-tertiary: #1e293b;
+            --color-text-primary: #f8fafc;
+            --color-text-secondary: #94a3b8;
+            --color-text-tertiary: #64748b;
+            --border-radius-lg: 12px;
+            --border-radius-md: 8px;
+            --font-sans: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --color-success: #10b981;
+            --color-warn: #f59e0b;
+            --color-err: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            font-size: 14px;
+            color: var(--color-text-primary);
+            background-color: var(--color-bg-primary);
+            min-height: 100vh;
+            padding: 2rem;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--color-border-secondary);
+            padding-bottom: 1.5rem;
+        }
+
+        header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header p {
+            color: var(--color-text-secondary);
+            font-size: 14px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--color-border-secondary);
+            overflow-x: auto;
+            scrollbar-width: none;
+            margin-bottom: 1.5rem;
+        }
+
+        .tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            white-space: nowrap;
+            color: var(--color-text-secondary);
+            transition: all .2s;
+            user-select: none;
+        }
+
+        .tab.active {
+            color: var(--color-text-primary);
+            border-bottom-color: var(--color-border-primary);
+        }
+
+        .tab:hover:not(.active) {
+            color: var(--color-text-primary);
+            background: var(--color-bg-secondary);
+            border-radius: var(--border-radius-md) var(--border-radius-md) 0 0;
+        }
+
+        .sec {
+            display: none;
+            animation: fadeIn 0.25s ease-out;
+        }
+
+        .sec.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Cards */
+        .card {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border-secondary);
+            border-radius: var(--border-radius-lg);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--color-text-primary);
+        }
+
+        .card-sub {
+            font-size: 13px;
+            color: var(--color-text-secondary);
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+
+        .grid2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(540px, 1fr));
+            gap: 1rem;
+        }
+
+        .grid3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        /* Priority ladder */
+        .ladder {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .rung {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            padding: 1rem 1.25rem;
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border-secondary);
+            border-radius: var(--border-radius-md);
+            transition: transform 0.2s;
+        }
+
+        .rung:hover {
+            transform: translateX(4px);
+        }
+
+        .rung-num {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+            background-color: var(--color-bg-tertiary);
+            border: 1px solid var(--color-border-secondary);
+        }
+
+        .rung-body {
+            flex: 1;
+        }
+
+        .rung-title {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .rung-desc {
+            font-size: 13px;
+            color: var(--color-text-secondary);
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+
+        .rung-example {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            background: var(--color-bg-primary);
+            padding: 6px 12px;
+            border-radius: 4px;
+            line-height: 1.6;
+            color: var(--color-text-secondary);
+            border: 1px solid var(--color-border-tertiary);
+        }
+
+        .conf-badge {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        /* Data model table */
+        .dm-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-top: 0.5rem;
+        }
+
+        .dm-table th {
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--color-border-secondary);
+        }
+
+        .dm-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--color-border-tertiary);
+            vertical-align: top;
+            line-height: 1.5;
+        }
+
+        .dm-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .dm-table code {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            background: var(--color-bg-primary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--color-border-primary);
+        }
+
+        .dm-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        /* Parameter graph search & filters */
+        .search-row {
+            margin-bottom: 1rem;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 16px;
+            border: 1px solid var(--color-border-secondary);
+            border-radius: var(--border-radius-md);
+            background: var(--color-bg-secondary);
+            color: var(--color-text-primary);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: var(--color-border-primary);
+        }
+
+        .param-filter {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .pf-btn {
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid var(--color-border-secondary);
+            border-radius: 20px;
+            cursor: pointer;
+            background: transparent;
+            color: var(--color-text-secondary);
+            transition: all .2s;
+        }
+
+        .pf-btn.active, .pf-btn:hover {
+            background: var(--color-bg-secondary);
+            color: var(--color-text-primary);
+            border-color: var(--color-border-primary);
+        }
+
+        .param-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .param-item {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border-secondary);
+            border-radius: var(--border-radius-lg);
+            padding: 1.25rem;
+        }
+
+        .param-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 0.75rem;
+        }
+
+        .param-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .param-unit {
+            font-size: 11px;
+            color: var(--color-text-secondary);
+            background: var(--color-bg-primary);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+        }
+
+        .param-cat {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .method-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 10px;
+            margin-top: 0.75rem;
+        }
+
+        .method {
+            background: var(--color-bg-primary);
+            border: 1px solid var(--color-border-tertiary);
+            border-radius: var(--border-radius-md);
+            padding: 10px 12px;
+            font-size: 13px;
+        }
+
+        .method-title {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 4px;
+            color: var(--color-text-primary);
+        }
+
+        .method-formula {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--color-border-primary);
+            margin-bottom: 4px;
+        }
+
+        .method-inputs {
+            font-size: 11px;
+            color: var(--color-text-secondary);
+        }
+
+        /* Conflicts */
+        .conflict-card {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border-secondary);
+            border-radius: var(--border-radius-lg);
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+        }
+
+        .conflict-title {
+            font-weight: 650;
+            font-size: 15px;
+            margin-bottom: 6px;
+            color: var(--color-text-primary);
+        }
+
+        .conflict-sub {
+            font-size: 13px;
+            color: var(--color-text-secondary);
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .conflict-example {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            background: var(--color-bg-primary);
+            border-left: 3px solid var(--color-err);
+            padding: 8px 12px;
+            border-radius: 0 4px 4px 0;
+            line-height: 1.6;
+            margin-bottom: 10px;
+            color: var(--color-text-secondary);
+        }
+
+        .conflict-causes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .conflict-cause {
+            font-size: 11px;
+            font-weight: 500;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: var(--color-bg-primary);
+            color: var(--color-text-secondary);
+            border: 1px solid var(--color-border-tertiary);
+        }
+
+        /* Simulator */
+        .sim-wrap {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border-secondary);
+            border-radius: var(--border-radius-lg);
+            padding: 1.5rem;
+            max-width: 680px;
+            margin: 0 auto;
+        }
+
+        .sim-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+
+        .sim-label {
+            font-size: 13px;
+            font-weight: 600;
+            min-width: 140px;
+        }
+
+        .sim-input {
+            padding: 8px 12px;
+            border: 1px solid var(--color-border-secondary);
+            border-radius: var(--border-radius-md);
+            background: var(--color-bg-primary);
+            color: var(--color-text-primary);
+            font-size: 13px;
+            width: 220px;
+            outline: none;
+        }
+
+        .sim-input:focus {
+            border-color: var(--color-border-primary);
+        }
+
+        .sim-type {
+            padding: 7px 10px;
+            border: 1px solid var(--color-border-secondary);
+            border-radius: var(--border-radius-md);
+            background: var(--color-bg-primary);
+            color: var(--color-text-primary);
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .sim-btn {
+            padding: 10px 24px;
+            border: 1px solid var(--color-border-secondary);
+            border-radius: var(--border-radius-md);
+            background: var(--color-bg-tertiary);
+            color: var(--color-text-primary);
+            font-size: 13px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all .2s;
+        }
+
+        .sim-btn:hover {
+            background: var(--color-border-secondary);
+        }
+
+        .sim-out {
+            margin-top: 1.5rem;
+            padding: 1.25rem;
+            background: var(--color-bg-primary);
+            border-radius: var(--border-radius-md);
+            border: 1px solid var(--color-border-tertiary);
+            font-size: 13px;
+            line-height: 1.7;
+            display: none;
+        }
+
+        .sim-out.visible {
+            display: block;
+        }
+
+        .result-header {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 8px;
+            border-bottom: 1px solid var(--color-border-tertiary);
+            padding-bottom: 4px;
+        }
+
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--color-border-tertiary);
+            font-size: 13px;
+        }
+
+        .result-row:last-child {
+            border: none;
+        }
+
+        .result-label {
+            color: var(--color-text-secondary);
+        }
+
+        .result-val {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-ok { color: var(--color-success); }
+        .status-warn { color: var(--color-warn); }
+        .status-err { color: var(--color-err); }
+
+        /* Architecture */
+        .arch-section {
+            margin-bottom: 2rem;
+        }
+
+        .arch-section-title {
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--color-text-secondary);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--color-border-secondary);
+        }
+
+        .step-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 10px 14px;
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border-secondary);
+            border-radius: var(--border-radius-md);
+            font-size: 13px;
+        }
+
+        .step-n {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--color-text-tertiary);
+            min-width: 24px;
+        }
+
+        .step-body {
+            flex: 1;
+        }
+
+        .step-title {
+            font-weight: 600;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .step-sub {
+            color: var(--color-text-secondary);
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Universal Engineering Parameter Resolution Framework</h1>
+            <p>Interactive engineering knowledge reference & priority solver for MAGTORQ Gearbox Selection Engine</p>
+        </header>
+
+        <div class="tabs" id="tabs">
+            <div class="tab active" data-sec="hierarchy" onclick="sw(this)">Resolution Hierarchy</div>
+            <div class="tab" data-sec="datamodel" onclick="sw(this)">Data Model</div>
+            <div class="tab" data-sec="params" onclick="sw(this)">Parameter Graph</div>
+            <div class="tab" data-sec="conflict" onclick="sw(this)">Conflict Model</div>
+            <div class="tab" data-sec="simulator" onclick="sw(this)">Interactive Simulator</div>
+            <div class="tab" data-sec="arch" onclick="sw(this)">Architecture & Units</div>
+        </div>
+
+        <!-- HIERARCHY -->
+        <div class="sec active" id="sec-hierarchy">
+            <div class="card">
+                <div class="card-title">Universal Parameter Priority Ladder</div>
+                <div class="card-sub">MAGTORQ parameter resolution evaluates extracted text through this priority sequence. Stated inputs take complete precedence over mathematical estimations.</div>
+                <div class="ladder" id="ladder"></div>
+            </div>
+        </div>
+
+        <!-- DATA MODEL -->
+        <div class="sec" id="sec-datamodel">
+            <div class="card">
+                <div class="card-title">Parameter Object Schema</div>
+                <div class="card-sub">Every parameter is modeled structurally to allow audit traceability, confidence score propagation, and source badges.</div>
+                <div class="grid2">
+                    <div>
+                        <h4 style="margin-bottom: 8px;">EngineeringParameter</h4>
+                        <table class="dm-table">
+                            <thead>
+                                <tr>
+                                    <th>Field</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>id</code></td><td>string</td><td>Internal ID (e.g. <code>outputRPM</code>)</td></tr>
+                                <tr><td><code>name</code></td><td>string</td><td>Human-readable display name</td></tr>
+                                <tr><td><code>si_unit</code></td><td>string</td><td>Canonical SI unit used internally</td></tr>
+                                <tr><td><code>value</code></td><td>ValueNode</td><td>Current value state wrapper</td></tr>
+                                <tr><td><code>confidence</code></td><td>float (0-1)</td><td>Calculated resolution confidence</td></tr>
+                                <tr><td><code>audit_trail</code></td><td>AuditEntry[]</td><td>Step-by-step logs for trace audits</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                        <h4 style="margin-bottom: 8px;">ValueNode</h4>
+                        <table class="dm-table">
+                            <thead>
+                                <tr>
+                                    <th>Field</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>type</code></td><td>enum</td><td>EXACT · RANGE · DERIVED · ASSUMED · UNRESOLVED</td></tr>
+                                <tr><td><code>exact</code></td><td>number | null</td><td>Resolved exact parameter value</td></tr>
+                                <tr><td><code>min</code></td><td>number | null</td><td>Minimum boundary limit</td></tr>
+                                <tr><td><code>max</code></td><td>number | null</td><td>Maximum boundary limit</td></tr>
+                                <tr><td><code>source_priority</code></td><td>1-7</td><td>Rank from priority ladder</td></tr>
+                                <tr><td><code>validation_status</code></td><td>enum</td><td>VALID · WARN · CONFLICT</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PARAMETER GRAPH -->
+        <div class="sec" id="sec-params">
+            <div class="search-row">
+                <input class="search-input" id="param-search" placeholder="Search parameters by name, formula, or category..." oninput="filterParams(this.value)">
+            </div>
+            <div class="param-filter" id="param-filters">
+                <button class="pf-btn active" onclick="filterCat('All')">All Categories</button>
+                <button class="pf-btn" onclick="filterCat('Mechanical')">Mechanical</button>
+                <button class="pf-btn" onclick="filterCat('Electrical')">Electrical</button>
+                <button class="pf-btn" onclick="filterCat('Hydraulic')">Hydraulic</button>
+                <button class="pf-btn" onclick="filterCat('Design')">Design</button>
+            </div>
+            <div class="param-list" id="param-list"></div>
+        </div>
+
+        <!-- CONFLICT MODEL -->
+        <div class="sec" id="sec-conflict">
+            <div class="card">
+                <div class="card-title">Conflict Validation Policy</div>
+                <div class="card-sub">Engineering conflict checks protect against unrealistic user specifications (e.g. invalid speed ratios or torque/power calculations). Inconsistent parameters raise validation markers:</div>
+                <div id="conflict-list"></div>
+                <div style="font-family: var(--font-mono); font-size: 12px; margin-top: 1.5rem; padding: 12px; background: var(--color-bg-primary); border-radius: 6px; line-height: 1.8;">
+                    <span style="color: var(--color-success)">✓ Deviation < 2%:</span> Warning only. Log discrepancy and proceed.<br>
+                    <span style="color: var(--color-warn)">⚠ Deviation 2% - 10%:</span> Design Error. Raise critical audit warning.<br>
+                    <span style="color: var(--color-err)">✗ Deviation > 10%:</span> Hard Conflict. Throw validation block.
+                </div>
+            </div>
+        </div>
+
+        <!-- SIMULATOR -->
+        <div class="sec" id="sec-simulator">
+            <div class="card">
+                <div class="card-title">Resolution Sandbox Engine</div>
+                <div class="card-sub">Experiment with parameter priority resolution. Enter values (exact or range) to calculate derived variables and verify calculations.</div>
+                <div class="sim-wrap">
+                    <div class="sim-row">
+                        <span class="sim-label">Power</span>
+                        <input class="sim-input" id="s-power" placeholder="e.g. 15 or 10-20">
+                        <select class="sim-type" id="s-power-u">
+                            <option>kW</option>
+                            <option>HP</option>
+                        </select>
+                    </div>
+                    <div class="sim-row">
+                        <span class="sim-label">Input RPM (n_in)</span>
+                        <input class="sim-input" id="s-n-in" placeholder="e.g. 1480 or 960-1500">
+                        <span style="color: var(--color-text-secondary)">RPM</span>
+                    </div>
+                    <div class="sim-row">
+                        <span class="sim-label">Output RPM (n_out)</span>
+                        <input class="sim-input" id="s-n-out" placeholder="e.g. 12 or 8-15">
+                        <span style="color: var(--color-text-secondary)">RPM</span>
+                    </div>
+                    <div class="sim-row">
+                        <span class="sim-label">Gear Ratio (i)</span>
+                        <input class="sim-input" id="s-ratio" placeholder="e.g. 80 or 50-100">
+                        <span style="color: var(--color-text-secondary)">:1</span>
+                    </div>
+                    <div class="sim-row">
+                        <span class="sim-label">Gearbox Efficiency (η)</span>
+                        <input class="sim-input" id="s-eta" value="0.96" placeholder="0.96">
+                        <span style="color: var(--color-text-secondary)">factor</span>
+                    </div>
+                    <div style="margin-top: 1rem;">
+                        <button class="sim-btn" onclick="runSim()">Execute Resolver</button>
+                        <button class="sim-btn" onclick="clearSim()" style="background: transparent; border-color: transparent; color: var(--color-text-secondary);">Clear Form</button>
+                    </div>
+                    <div class="sim-out" id="sim-out"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ARCHITECTURE -->
+        <div class="sec" id="sec-arch">
+            <div class="arch-section">
+                <div class="arch-section-title">Analysis Pipeline Order</div>
+                <div class="step-list" id="arch-pipeline"></div>
+            </div>
+            <div class="arch-section">
+                <div class="arch-section-title">Unit Conversion Reference Table</div>
+                <div class="card">
+                    <table class="dm-table">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Input Unit</th>
+                                <th>Multiplier / Formula</th>
+                                <th>Output Canonical SI</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Power</td><td>Horsepower (HP)</td><td><code>value * 0.7457</code></td><td>kW</td></tr>
+                            <tr><td>Torque</td><td>Kilogram-force meter (kgf·m)</td><td><code>value * 9.80665</code></td><td>N·m</td></tr>
+                            <tr><td>Torque</td><td>Pound-force foot (lbf·ft)</td><td><code>value * 1.3558</code></td><td>N·m</td></tr>
+                            <tr><td>Torque</td><td>Pound-force inch (lbf·in)</td><td><code>value * 0.11298</code></td><td>N·m</td></tr>
+                            <tr><td>Speed</td><td>Linear Belt Speed (m/min)</td><td><code>value / 60</code></td><td>m/s</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const HIERARCHY = [
+            { p: 1, title: 'Direct exact value', desc: 'Directly provided by user / extracted from nameplate specs.', example: 'Input RPM = 1480', conf: 0.99, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
+            { p: 2, title: 'Derived exact value', desc: 'Derived using deterministic physical formulas (e.g. sync speed).', example: 'n = 120 * f / poles = 1500 RPM', conf: 0.97, color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.1)' },
+            { p: 3, title: 'Validated exact value', desc: 'A calculated value confirmed by cross-checking equations.', example: 'P = T * n / 9550 is mathematically validated', conf: 0.95, color: '#818cf8', bg: 'rgba(129, 140, 248, 0.1)' },
+            { p: 4, title: 'Operating point resolution', desc: 'Stated ranges narrowed using industry standard variables.', example: 'Selects 1450 RPM motor speed for standard 4-pole operating conditions', conf: 0.80, color: '#a78bfa', bg: 'rgba(167, 139, 250, 0.1)' },
+            { p: 5, title: 'Narrowed range', desc: 'A broad range narrowed down using mathematical intersection.', example: 'Speed range narrowed from 500-1500 to 900-1100 based on drive constraints', conf: 0.65, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+            { p: 6, title: 'Original range', desc: 'Retained as the user provided range without any updates.', example: 'Torque = 3500 - 5000 N·m', conf: 0.40, color: '#fb923c', bg: 'rgba(251, 146, 60, 0.1)' },
+            { p: 7, title: 'Engineering assumption', desc: 'Industry standard defaults applied when parameter is entirely missing.', example: 'Gearbox Efficiency assumed 0.96 for helical planetary stages', conf: 0.25, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' }
+        ];
+
+        const PARAMS = [
+            { name: 'Output Torque', unit: 'N·m', cat: 'Mechanical', methods: [
+                { title: 'Power + Speed', formula: 'T = (P_kW * η * 9549.3) / n_out', inputs: 'Power (kW), Efficiency (η), Output Speed (RPM)' },
+                { title: 'Force + Pulley Radius', formula: 'T = F_N * Radius_m', inputs: 'Effective Pull Force (N), Pulley Diameter (m)' }
+            ]},
+            { name: 'Gear Ratio', unit: ':1', cat: 'Mechanical', methods: [
+                { title: 'Speeds Ratio', formula: 'i = n_in / n_out', inputs: 'Input Speed (RPM), Output Speed (RPM)' },
+                { title: 'Teeth count', formula: 'i = z_gear / z_pinion', inputs: 'Pinion & Gear tooth counts' }
+            ]},
+            { name: 'Power Rating', unit: 'kW', cat: 'Mechanical', methods: [
+                { title: 'Torque + Speed', formula: 'P = T * n / 9550', inputs: 'Torque (N·m), Speed (RPM)' }
+            ]},
+            { name: 'Service Factor', unit: 'multiplier', cat: 'Design', methods: [
+                { title: 'Application-based Lookup', formula: 'SF = Base_SF + Duty_Adjustment + Shock_Adjustment', inputs: 'Application Type, Operating Hours, Shock Class' }
+            ]}
+        ];
+
+        const CONFLICTS = [
+            { title: 'Speed-Ratio Conflict', sub: 'Derived output speed (n_in / ratio) does not match the stated output speed.', example: 'Input RPM: 1000, Ratio: 80, Output RPM Stated: 20.\nDerived Output: 1000 / 80 = 12.5 RPM (inconsistent!)' },
+            { title: 'Torque-Power-Speed Conflict', sub: 'The three exact values violate the conservation of power formula.', example: 'P: 15 kW, n: 25 RPM, T: 4000 N·m.\nDerived Torque should be 5730 N·m (inconsistent!)' }
+        ];
+
+        const PIPELINE = [
+            { n: '01', title: 'Pre-process text input', sub: 'Runs range replacements (e.g. changing "A to B" to "A-B") and strips unit syntax.' },
+            { n: '02', title: 'Extract Parameters & Unit Normalization', sub: 'Applies regex patterns to map user parameters to internal variables and converts non-SI units.' },
+            { n: '03', title: 'Application Knowledge Engine Analysis', sub: 'Detects the gearbox application category (e.g., Conveyor, Agitator) to look up design preferences.' },
+            { n: '04', title: 'Upstream Derivations & Calculations', sub: 'Executes mathematical rules (e.g. pole speed formulas) to enrich missing inputs.' },
+            { n: '05', title: 'Verify & Audit Consistency Checks', sub: 'Checks resolved values against ranges to ensure no design conflicts are raised.' }
+        ];
+
+        function sw(el) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.sec').forEach(s => s.classList.remove('active'));
+            el.classList.add('active');
+            document.getElementById('sec-' + el.dataset.sec).classList.add('active');
+        }
+
+        function renderHierarchy() {
+            const container = document.getElementById('ladder');
+            container.innerHTML = HIERARCHY.map(r => `
+                <div class="rung" style="border-left: 4px solid ${r.color}">
+                    <div class="rung-num" style="color: ${r.color}; background: ${r.bg}">${r.p}</div>
+                    <div class="rung-body">
+                        <div class="rung-title">
+                            <span>${r.title}</span>
+                            <span class="conf-badge" style="color: ${r.color}; background: ${r.bg}">Confidence: ${(r.conf*100).toFixed(0)}%</span>
+                        </div>
+                        <div class="rung-desc">${r.desc}</div>
+                        <div class="rung-example">Example: ${r.example}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderParams() {
+            const container = document.getElementById('param-list');
+            container.innerHTML = PARAMS.map(p => `
+                <div class="param-item" data-cat="${p.cat}">
+                    <div class="param-head">
+                        <span class="param-name">${p.name}</span>
+                        <span class="param-unit">${p.unit}</span>
+                        <span class="param-cat" style="background: rgba(56, 189, 248, 0.1); color: var(--color-border-primary)">${p.cat}</span>
+                    </div>
+                    <div class="method-list">
+                        ${p.methods.map(m => `
+                            <div class="method">
+                                <div class="method-title">${m.title}</div>
+                                <div class="method-formula">${m.formula}</div>
+                                <div class="method-inputs">Inputs: ${m.inputs}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterParams(query) {
+            const items = document.querySelectorAll('.param-item');
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(query.toLowerCase())) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        let currentCat = 'All';
+        function filterCat(cat) {
+            currentCat = cat;
+            document.querySelectorAll('#param-filters .pf-btn').forEach(btn => {
+                if (btn.textContent.includes(cat)) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+            const items = document.querySelectorAll('.param-item');
+            items.forEach(item => {
+                if (cat === 'All' || item.dataset.cat === cat) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        function renderConflicts() {
+            const container = document.getElementById('conflict-list');
+            container.innerHTML = CONFLICTS.map(c => `
+                <div class="conflict-card" style="border-left: 4px solid var(--color-err)">
+                    <div class="conflict-title">${c.title}</div>
+                    <div class="conflict-sub">${c.sub}</div>
+                    <div class="conflict-example">${c.example}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderArchitecture() {
+            const container = document.getElementById('arch-pipeline');
+            container.innerHTML = PIPELINE.map(s => `
+                <div class="step">
+                    <span class="step-n">${s.n}</span>
+                    <div class="step-body">
+                        <span class="step-title">${s.title}</span>
+                        <span class="step-sub">${s.sub}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function runSim() {
+            const powerStr = document.getElementById('s-power').value.trim();
+            const nInStr = document.getElementById('s-n-in').value.trim();
+            const nOutStr = document.getElementById('s-n-out').value.trim();
+            const ratioStr = document.getElementById('s-ratio').value.trim();
+            const eta = parseFloat(document.getElementById('s-eta').value) || 0.96;
+
+            const parseVal = (str) => {
+                if (!str) return null;
+                if (str.includes('-')) {
+                    const parts = str.split('-').map(parseFloat);
+                    return { type: 'range', min: parts[0], max: parts[1] };
+                }
+                return { type: 'exact', value: parseFloat(str) };
+            };
+
+            const power = parseVal(powerStr);
+            const nIn = parseVal(nInStr);
+            const nOut = parseVal(nOutStr);
+            const ratio = parseVal(ratioStr);
+
+            let outHTML = '<div class="result-header">Resolution Output Log</div>';
+            
+            // Priority execution
+            let resolvedRatio = ratio;
+            let resolvedNOut = nOut;
+            let resolvedNIn = nIn;
+            let status = 'status-ok';
+
+            if (nIn && nIn.type === 'exact' && nOut && nOut.type === 'exact') {
+                const derivedRatio = nIn.value / nOut.value;
+                if (ratio && ratio.type === 'exact') {
+                    if (Math.abs(derivedRatio - ratio.value) > 0.05) {
+                        outHTML += `<div class="result-row status-err"><span class="result-label">Status</span><span class="result-val">Conflict detected! Stated ratio ${ratio.value} differs from speeds ratio ${derivedRatio.toFixed(2)}</span></div>`;
+                        status = 'status-err';
+                    } else {
+                        outHTML += `<div class="result-row status-ok"><span class="result-label">Status</span><span class="result-val">Valid EXACT consistency verified!</span></div>`;
+                    }
+                } else if (ratio && ratio.type === 'range') {
+                    if (derivedRatio >= ratio.min && derivedRatio <= ratio.max) {
+                        resolvedRatio = { type: 'exact', value: derivedRatio };
+                        outHTML += `<div class="result-row status-ok"><span class="result-label">Status</span><span class="result-val">Derived Ratio ${derivedRatio.toFixed(2)} successfully collapsed range!</span></div>`;
+                    } else {
+                        outHTML += `<div class="result-row status-err"><span class="result-label">Status</span><span class="result-val">Conflict! Derived ratio ${derivedRatio.toFixed(2)} falls outside range</span></div>`;
+                        status = 'status-err';
+                    }
+                } else {
+                    resolvedRatio = { type: 'exact', value: derivedRatio };
+                    outHTML += `<div class="result-row"><span class="result-label">Ratio derived</span><span class="result-val">${derivedRatio.toFixed(2)} (:1)</span></div>`;
+                }
+            } else if (nIn && nIn.type === 'exact' && ratio && ratio.type === 'exact' && (!nOut || nOut.type === 'range')) {
+                const derivedNOut = nIn.value / ratio.value;
+                if (nOut && nOut.type === 'range') {
+                    if (derivedNOut >= nOut.min && derivedNOut <= nOut.max) {
+                        resolvedNOut = { type: 'exact', value: derivedNOut };
+                    } else {
+                        status = 'status-err';
+                    }
+                } else {
+                    resolvedNOut = { type: 'exact', value: derivedNOut };
+                }
+            }
+
+            outHTML += `
+                <div class="result-row"><span class="result-label">Input RPM (n_in)</span><span class="result-val">${resolvedNIn ? (resolvedNIn.type === 'exact' ? resolvedNIn.value : resolvedNIn.min + '-' + resolvedNIn.max) : 'N/A'}</span></div>
+                <div class="result-row"><span class="result-label">Output RPM (n_out)</span><span class="result-val">${resolvedNOut ? (resolvedNOut.type === 'exact' ? resolvedNOut.value.toFixed(2) : resolvedNOut.min + '-' + resolvedNOut.max) : 'N/A'}</span></div>
+                <div class="result-row"><span class="result-label">Ratio (i)</span><span class="result-val">${resolvedRatio ? (resolvedRatio.type === 'exact' ? resolvedRatio.value.toFixed(2) : resolvedRatio.min + '-' + resolvedRatio.max) : 'N/A'}</span></div>
+            `;
+
+            const outBox = document.getElementById('sim-out');
+            outBox.className = 'sim-out visible';
+            outBox.innerHTML = outHTML;
+        }
+
+        function clearSim() {
+            document.querySelectorAll('.sim-input').forEach(i => i.value = '');
+            const outBox = document.getElementById('sim-out');
+            outBox.className = 'sim-out';
+            outBox.innerHTML = '';
+        }
+
+        // Init
+        renderHierarchy();
+        renderParams();
+        renderConflicts();
+        renderArchitecture();
+    </script>
+</body>
+</html>

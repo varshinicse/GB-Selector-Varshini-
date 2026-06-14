@@ -1,0 +1,119 @@
+<USER_REQUEST>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Torque Resolution Engine — Industrial Gearbox Engineering</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg2: #f5f4f0;
+    --bg3: #eeede8;
+    --text: #1a1a18;
+    --text2: #5a5a56;
+    --text3: #8a8a84;
+    --border: rgba(0,0,0,0.12);
+    --border2: rgba(0,0,0,0.22);
+    --radius: 10px;
+    --radius-sm: 6px;
+    --blue: #185FA5;
+    --blue-bg: #E6F1FB;
+    --teal: #0F6E56;
+    --teal-bg: #E1F5EE;
+    --amber: #854F0B;
+    --amber-bg: #FAEEDA;
+    --red: #A32D2D;
+    --red-bg: #FCEBEB;
+    --purple: #533AB7;
+    --purple-bg: #EEEDFE;
+    --green: #3B6D11;
+    --green-bg: #EAF3DE;
+    --coral: #993C1D;
+    --coral-bg: #FAECE7;
+    --pink: #993556;
+    --pink-bg: #FBEAF0;
+    --gray: #444441;
+    --gray-bg: #F1EFE8;
+    --mono: 'Courier New', monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a;
+      --bg2: #252523;
+      --bg3: #2e2e2b;
+      --text: #e8e6dc;
+      --text2: #a0a09a;
+      --text3: #6a6a64;
+      --border: rgba(255,255,255,0.10);
+      --border2: rgba(255,255,255,0.20);
+      --blue: #85B7EB; --blue-bg: #042C53;
+      --teal: #5DCAA5; --teal-bg: #04342C;
+      --amber: #EF9F27; --amber-bg: #412402;
+      --red: #F09595; --red-bg: #501313;
+      --purple: #AFA9EC; --purple-bg: #26215C;
+      --green: #97C459; --green-bg: #173404;
+      --coral: #F0997B; --coral-bg: #4A1B0C;
+      --pink: #ED93B1; --pink-bg: #4B1528;
+      --gray: #B4B2A9; --gray-bg: #2C2C2A;
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg2);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 24px 0;
+    positi
+<truncated 45215 bytes>
+ω',note:'Must know flow rate and pump efficiency to get torque'},
+  {term:'Reduction Ratio',conv:'T_out = T_in × i × η',note:'Ratio alone insufficient — need input torque or power as well'},
+  {term:'Torque Wrench Setting',conv:'T = direct reading',note:'Calibrated wrench gives torque directly in N·m or lbf·ft — no conversion'}
+];
+
+const REVERSE = [
+  {input:'Torque (N·m) + Speed (RPM)',outputs:[
+    {cond:'→ Power (kW)',formula:'P = T × n / 9550'},
+    {cond:'→ Belt Pull (N)',formula:'F = T / r_pulley'},
+    {cond:'→ Peripheral Speed',formula:'v = π × D × n / 60'}
+  ]},
+  {input:'Torque (N·m) + Power (kW)',outputs:[
+    {cond:'→ Speed (RPM)',formula:'n = P × 9550 / T'},
+    {cond:'→ Angular Velocity (rad/s)',formula:'ω = P / T'}
+  ]},
+  {input:'Torque (N·m) + Ratio (i)',outputs:[
+    {cond:'→ Input Torque',formula:'T_in = T_out / (i × η)'},
+    {cond:'→ Input Speed',formula:'n_in = n_out × i'},
+    {cond:'→ Input Power check',formula:'P_in = P_out / η'}
+  ]},
+  {input:'Torque (N·m) + Service Factor',outputs:[
+    {cond:'→ Design Torque',formula:'T_design = T_run × SF'},
+    {cond:'→ Min Rated Torque required',formula:'T_rated ≥ T_design'}
+  ]},
+  {input:'Torque (N·m) + Shaft Diameter (d)',outputs:[
+    {cond:'→ Shear Stress τ',formula:'τ = 16T / (π × d³)'},
+    {cond:'→ Angle of Twist φ',formula:'φ = TL / (G × J)'},
+    {cond:'→ Required d (given τ_allow)',formula:'d = ∛(16T / π × τ_allow)'}
+  ]},
+  {input:'Torque (N·m) + Module + Face Width',outputs:[
+    {cond:'→ Tangential force Ft',formula:'Ft = 2T / d  (d = m × z)'},
+    {cond:'→ Lewis bending stress σ',formula:'σ = Ft / (b × m × Y_J)'},
+    {cond:'→ Hertz contact stress σH',formula:'σH via ISO 6336 ZH × ZE × Zε formula'}
+  ]},
+  {input:'Torque (N·m) + Bearing Data',outputs:[
+    {cond:'→ Radial load on bearing',fo
+<truncated 36812 bytes>
+
+NOTE: The output was truncated because it was too long. Use a more targeted query or a smaller range to get the information you need.
