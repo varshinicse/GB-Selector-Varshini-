@@ -791,6 +791,16 @@ Output Torque: 4890 Nm`;
           expect(report.totalRatio.value).toBeCloseTo(36, 0);
           expect(report.outputRPM.value).toBeCloseTo(40, 0);
         });
+
+        it('should snap to motor poles from resolved input RPM when not explicitly provided', () => {
+          const report = generateAuditReport(
+            'Input speed 1000 RPM. Required Output Speed = 12 RPM. Connected Load = 15 HP.',
+            {}
+          );
+          expect(report.inputRPM.value).toBe(1000);
+          expect(report.motorPoles.value).toBe(6);
+          expect(report.motorPoles.type).toBe('DERIVED');
+        });
       });
     });
   });

@@ -1204,6 +1204,23 @@ export function generateAuditReport(
     }
   }
 
+  // Snaps to standard poles based on resolved input speed if poles are not explicitly provided
+  if ((extPoles === null || extPoles === undefined) && resolvedInputRPM) {
+    if (resolvedInputRPM >= 2700 && resolvedInputRPM <= 3100) {
+      extPoles = 2;
+      deducedPoles = true;
+    } else if (resolvedInputRPM >= 1350 && resolvedInputRPM <= 1550) {
+      extPoles = 4;
+      deducedPoles = true;
+    } else if (resolvedInputRPM >= 900 && resolvedInputRPM <= 1050) {
+      extPoles = 6;
+      deducedPoles = true;
+    } else if (resolvedInputRPM >= 680 && resolvedInputRPM <= 780) {
+      extPoles = 8;
+      deducedPoles = true;
+    }
+  }
+
   const formatVal = (norm: any, resolved: any) => {
     if (norm?.type === 'range') {
       return resolved !== null ? String(resolved) : `${norm.min}-${norm.max}`;
