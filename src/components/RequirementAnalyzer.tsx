@@ -1301,7 +1301,7 @@ export const RequirementAnalyzer: React.FC<RequirementAnalyzerProps> = ({ onAuto
                                   {reasoningResult.stageTraces.map((t, idx) => (
                                     <div key={idx} className="bg-slate-50 p-2.5 rounded-lg border border-slate-150 space-y-1 font-mono text-[10.5px]">
                                       <div className="font-extrabold text-slate-700">Stage {t.stage} Torque amplification:</div>
-                                      <div className="font-semibold text-slate-500">Formula: Tout = Tin &times; Ratio &times; 0.97 (efficiency)</div>
+                                      <div className="font-semibold text-slate-500">Formula: {t.torqueFormula}</div>
                                       <div className="font-bold text-slate-800">Steps: {t.torqueSteps}</div>
                                     </div>
                                   ))}

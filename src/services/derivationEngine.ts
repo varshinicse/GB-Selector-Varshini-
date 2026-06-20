@@ -511,20 +511,6 @@ export function parseInputsWithMetadata(text: string): ParserResult {
     if (isPercent || v > 1.0) return v / 100;
     return v;
   }, 'efficiency', 'Gearbox Efficiency');
-  if (eff === null) {
-    values.efficiency = 0.97;
-    nodes.efficiency = {
-      name: 'Gearbox Efficiency',
-      value: 0.97,
-      type: 'SUGGESTED',
-      source: 'Engine Default',
-      formula: 'N/A',
-      calculationSteps: 'Assumed 97% stage efficiency',
-      confidence: 'Medium',
-      reasoning: 'Standard default 97% planetary stage efficiency assumed.'
-    };
-  }
-
   // 8. Gear & Transmission Details for Gear Geometry Derivations
   matchValue([
     /(?:pinion\s*teeth|pinion\s*has|pinion\s*count)\s*(?:is|of|was)?\s*[:\s=]*\s*(\d+)/i
@@ -906,16 +892,30 @@ export const derivationRules: DerivationRule[] = [
     id: 'DR-015',
     name: 'Efficiency Corrected Torque',
     category: 'Torque',
-    requiredInputs: ['powerW', 'efficiency', 'outputRadS'],
+    requiredInputs: ['powerW', 'outputRadS'],
     outputParameter: 'outputTorqueNm',
     confidence: 'HIGH',
     autoCalculate: true,
     formulaString: 'Tout = (Pin × η) / ω_out',
     auditDescription: 'Calculates mechanical output shaft torque adjusted for losses across planetary stages.',
     formula: (inputs) => {
-      const { powerW, efficiency, outputRadS } = inputs;
+      const { powerW, outputRadS, efficiency, stages, totalRatio, inputRadS } = inputs;
       if (outputRadS <= 0) return null;
-      return (powerW * efficiency) / outputRadS;
+      let stagesCount = stages;
+      if (stagesCount === undefined) {
+        let ratio = totalRatio;
+        if (ratio === undefined && inputRadS !== undefined && inputRadS > 0) {
+          ratio = inputRadS / outputRadS;
+        }
+        if (ratio !== undefined && ratio > 0) {
+          if (ratio <= 10.26) stagesCount = 1;
+          else if (ratio <= 77.77) stagesCount = 2;
+          else if (ratio <= 393.5) stagesCount = 3;
+          else stagesCount = 4;
+        }
+      }
+      const effVal = efficiency !== undefined ? efficiency : Math.pow(0.97, stagesCount || 1);
+      return (powerW * effVal) / outputRadS;
     }
   },
   {
@@ -1424,16 +1424,25 @@ export const derivationRules: DerivationRule[] = [
     id: 'DR-RATIO-004',
     name: 'Torque Ratio (Efficiency-Corrected)',
     category: 'Ratio',
-    requiredInputs: ['outputTorqueNm', 'inputTorqueNm', 'efficiency'],
+    requiredInputs: ['outputTorqueNm', 'inputTorqueNm'],
     outputParameter: 'totalRatio',
     confidence: 'HIGH',
     autoCalculate: true,
     formulaString: 'Ratio = Tout / (Tin * η)',
     auditDescription: 'Derives overall gear reduction ratio from output torque and input torque accounting for stage efficiency losses.',
     formula: (inputs) => {
-      const { outputTorqueNm, inputTorqueNm, efficiency } = inputs;
-      if (inputTorqueNm <= 0 || efficiency <= 0) return null;
-      return outputTorqueNm / (inputTorqueNm * efficiency);
+      const { outputTorqueNm, inputTorqueNm, efficiency, stages } = inputs;
+      if (inputTorqueNm <= 0) return null;
+      let stagesCount = stages;
+      if (stagesCount === undefined) {
+        const ratioGuess = outputTorqueNm / inputTorqueNm;
+        if (ratioGuess <= 10.26) stagesCount = 1;
+        else if (ratioGuess <= 77.77) stagesCount = 2;
+        else if (ratioGuess <= 393.5) stagesCount = 3;
+        else stagesCount = 4;
+      }
+      const effVal = efficiency !== undefined ? efficiency : Math.pow(0.97, stagesCount || 1);
+      return outputTorqueNm / (inputTorqueNm * effVal);
     }
   },
   {
@@ -1456,16 +1465,24 @@ export const derivationRules: DerivationRule[] = [
     id: 'DR-TORQUE-007',
     name: 'Output Torque and Ratio to Input Torque',
     category: 'Torque',
-    requiredInputs: ['outputTorqueNm', 'totalRatio', 'efficiency'],
+    requiredInputs: ['outputTorqueNm', 'totalRatio'],
     outputParameter: 'inputTorqueNm',
     confidence: 'HIGH',
     autoCalculate: true,
     formulaString: 'Tin = Tout / (Ratio * η)',
     auditDescription: 'Derives input motor torque from output load torque, gearbox ratio, and efficiency.',
     formula: (inputs) => {
-      const { outputTorqueNm, totalRatio, efficiency } = inputs;
-      if (totalRatio <= 0 || efficiency <= 0) return null;
-      return outputTorqueNm / (totalRatio * efficiency);
+      const { outputTorqueNm, totalRatio, efficiency, stages } = inputs;
+      if (totalRatio <= 0) return null;
+      let stagesCount = stages;
+      if (stagesCount === undefined) {
+        if (totalRatio <= 10.26) stagesCount = 1;
+        else if (totalRatio <= 77.77) stagesCount = 2;
+        else if (totalRatio <= 393.5) stagesCount = 3;
+        else stagesCount = 4;
+      }
+      const effVal = efficiency !== undefined ? efficiency : Math.pow(0.97, stagesCount || 1);
+      return outputTorqueNm / (totalRatio * effVal);
     }
   }
 ];
@@ -1533,8 +1550,7 @@ export class MissingParameterResolutionEngine {
             if (!skips.some((s) => s.ruleId === rule.id)) {
               const formulaInputs = {
                 ...inputsMap,
-                is24x7Duty: derivedParameters.is24x7Duty,
-                isShockLoad: derivedParameters.isShockLoad
+                ...derivedParameters
               };
               skips.push({
                 ruleId: rule.id,
@@ -1577,8 +1593,7 @@ export class MissingParameterResolutionEngine {
             if (!skips.some((s) => s.ruleId === rule.id)) {
               const formulaInputs = {
                 ...inputsMap,
-                is24x7Duty: derivedParameters.is24x7Duty,
-                isShockLoad: derivedParameters.isShockLoad
+                ...derivedParameters
               };
               skips.push({
                 ruleId: rule.id,
@@ -1594,8 +1609,7 @@ export class MissingParameterResolutionEngine {
           try {
             const formulaInputs = {
               ...inputsMap,
-              is24x7Duty: derivedParameters.is24x7Duty,
-              isShockLoad: derivedParameters.isShockLoad
+              ...derivedParameters
             };
             const result = rule.formula(formulaInputs);
             if (result !== null && result !== undefined && !isNaN(result)) {
@@ -1629,6 +1643,14 @@ export class MissingParameterResolutionEngine {
                 let traceType: 'EXTRACTED' | 'CALCULATED' | 'DERIVED' | 'SUGGESTED' | 'ASSUMED' | 'ENGINE_RULE' | 'ASSUMED_VALUE' = 'ENGINE_RULE';
                 if (rule.requiredInputs.includes('efficiency') && !userProvidedKeys.has('efficiency')) {
                   traceType = 'ASSUMED_VALUE';
+                }
+
+                const hasUsedAssumedEfficiency = (rule.id === 'DR-015' || rule.id === 'DR-RATIO-004' || rule.id === 'DR-TORQUE-007') && !userProvidedKeys.has('efficiency');
+                if (hasUsedAssumedEfficiency) {
+                  traceType = 'ASSUMED_VALUE';
+                  if (traceConf !== 'LOW') {
+                    traceConf = 'MEDIUM';
+                  }
                 }
 
                 traces.push({
@@ -1710,6 +1732,20 @@ export class MissingParameterResolutionEngine {
 
     // Try resolving all possible target output parameters in a fixed-point iteration loop
     const allTargets = Array.from(new Set(derivationRules.map((r) => r.outputParameter)));
+    allTargets.sort((a, b) => {
+      const priority: Record<string, number> = {
+        inputRadS: 1,
+        inputRPM: 1,
+        outputRadS: 2,
+        outputRPM: 2,
+        totalRatio: 3,
+        stages: 4,
+        efficiency: 5
+      };
+      const pA = priority[a] !== undefined ? priority[a] : 99;
+      const pB = priority[b] !== undefined ? priority[b] : 99;
+      return pA - pB;
+    });
     let lastResolvedCount = -1;
     let currentResolvedCount = 0;
     while (currentResolvedCount > lastResolvedCount) {

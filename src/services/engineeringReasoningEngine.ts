@@ -1557,10 +1557,17 @@ ${notes}`);
 
     // Distribute ratios
     const { ratios, series } = distributeRatios(R_req, stagesNode.value);
-    overallEfficiency = TorquePropagationEngine.overallEfficiency(stagesNode.value);
+    const effVal = (parserResult.values.efficiency !== undefined && parserResult.values.efficiency !== null)
+      ? parserResult.values.efficiency
+      : TorquePropagationEngine.overallEfficiency(stagesNode.value);
+    overallEfficiency = effVal;
 
     let speed = Nin;
     let torque = Tin;
+
+    const stageEff = (parserResult.values.efficiency !== undefined && parserResult.values.efficiency !== null)
+      ? Math.pow(parserResult.values.efficiency, 1 / stagesNode.value)
+      : 0.97;
 
     for (let i = 0; i < stagesNode.value; i++) {
       const ratio = ratios[i];
@@ -1569,7 +1576,7 @@ ${notes}`);
       const speedBefore = speed;
       const speedAfter = speed / ratio;
       const torqueBefore = torque;
-      const torqueAfter = torque * ratio * 0.97;
+      const torqueAfter = torque * ratio * stageEff;
       const maxTorqueAfter = torqueAfter * serviceFactorNode.value;
 
       // Select Gearbox
@@ -1606,8 +1613,8 @@ ${notes}`);
         
         speedFormula: 'N_out = N_in / Ratio',
         speedSteps: `N_out = ${speedBefore.toFixed(1)} / ${ratio} = ${speedAfter.toFixed(1)} RPM`,
-        torqueFormula: 'Tout = Tin × Ratio × 0.97',
-        torqueSteps: `Tout = ${torqueBefore.toFixed(2)} × ${ratio} × 0.97 = ${torqueAfter.toFixed(2)} N·m`,
+        torqueFormula: `Tout = Tin × Ratio × ${stageEff.toFixed(4)}`,
+        torqueSteps: `Tout = ${torqueBefore.toFixed(2)} × ${ratio} × ${stageEff.toFixed(4)} = ${torqueAfter.toFixed(2)} N·m`,
         gbNominalCheck: `GB Nominal Capacity = ${gb.nominal} N·m vs Stage Nominal = ${PowerTorqueEngine.formatTorqueExact(torqueAfter)} N·m (Ratio: ${(gb.nominal / torqueAfter).toFixed(2)})`,
         gbRatedCheck: `GB Rated Capacity = ${gb.rated} N·m vs Stage Maximum = ${PowerTorqueEngine.formatTorqueExact(maxTorqueAfter)} N·m (Ratio: ${(gb.rated / maxTorqueAfter).toFixed(2)})`,
         safetyFormula: 'SF = min(GBNominal / StageNominal, GBRated / StageMaximum)',
