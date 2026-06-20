@@ -504,7 +504,7 @@ export function parseInputsWithMetadata(text: string): ParserResult {
     /(?:input\s+power|inputPower|power|P_in)\s*(?:is|of|was)?\s*[:\s=]*\s*(\d+\.?\d*)\s*(?:kW|kw)?/i
   ], undefined, 'inputPower_kW', 'Input Power');
 
-  const eff = matchValue([
+  matchValue([
     /(?:efficiency|gearboxEfficiency|η)\s*(?:is|of|was)?\s*[:\s=]*\s*(\d+\.?\d*)\s*(%)?/i
   ], (v, match) => {
     const isPercent = match[2] === '%';
