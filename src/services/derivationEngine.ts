@@ -140,6 +140,18 @@ export function parseInputsWithMetadata(text: string): ParserResult {
     /(\d+(?:\.\d+)?)(?![.\d])(?!\s*(?:kW|HP|kw|hp|watts?|W\b|m\/s|m\/min|kN|N|ton|tons|t\b))\s*(RPM|r\/min|speed|RPS|rps)?\s*(?:is|of|was)?\s*[:=\s]*\s*(?<!input\s+|motor\s+|inlet\s+|drive\s+)(?:Output\s+Speed|Required\s+Speed|Gearbox\s+Output\s+Speed|Agitator\s+Speed|Drum\s+Speed|Conveyor\s+Speed|Mixer\s+Speed|Shaft\s+Speed|Table\s+Speed|Roll\s+Speed|Kiln\s+Speed|Mill\s+Speed|Bucket\s+Speed|Screw\s+Speed|\bOUT\s+SPD\b|\bOUT\.\s*SPD\b|\bOUTPUT\s+SPD\b)/i
   ], (v) => v * (2 * Math.PI) / 60, 'outputRadS', 'Output Speed');
 
+  // Output Speed Max Constraint
+  matchValue([
+    /(?<!input\s+|motor\s+|inlet\s+|drive\s+)(?:Output\s+Speed|Required\s+Speed|Gearbox\s+Output\s+Speed|Agitator\s+Speed|Drum\s+Speed|Conveyor\s+Speed|Mixer\s+Speed|Shaft\s+Speed|Table\s+Speed|Roll\s+Speed|Kiln\s+Speed|Mill\s+Speed|Bucket\s+Speed|Screw\s+Speed|Required\s+Output\s+Speed|\bOUT\s+SPD\b|\bOUT\.\s*SPD\b|\bOUTPUT\s+SPD\b|\bRPM\b)(?:\s+(?:Limit|Range|Req|Requirement|Threshold))?\s*(?:<=|less\s+than|max|maximum|should\s+be\s+less\s+than|should\s+be\s*<=)\s*(\d+(?:\.\d+)?)/i,
+    /(?:max|maximum)\s+(?:Output\s+Speed|Required\s+Speed|Gearbox\s+Output\s+Speed|Agitator\s+Speed|Drum\s+Speed|Conveyor\s+Speed|Mixer\s+Speed|Shaft\s+Speed|Table\s+Speed|Roll\s+Speed|Kiln\s+Speed|Mill\s+Speed|Bucket\s+Speed|Screw\s+Speed|Required\s+Output\s+Speed|\bOUT\s+SPD\b|\bOUT\.\s*SPD\b|\bOUTPUT\s+SPD\b|\bRPM\b)(?:\s+(?:Limit|Range|Req|Requirement|Threshold))?\s*(?:of|is|was)?\s*[:=\s]*\s*(\d+(?:\.\d+)?)/i
+  ], undefined, 'outputSpeedMax', 'Max Output Speed Constraint');
+
+  // Output Speed Min Constraint
+  matchValue([
+    /(?<!input\s+|motor\s+|inlet\s+|drive\s+)(?:Output\s+Speed|Required\s+Speed|Gearbox\s+Output\s+Speed|Agitator\s+Speed|Drum\s+Speed|Conveyor\s+Speed|Mixer\s+Speed|Shaft\s+Speed|Table\s+Speed|Roll\s+Speed|Kiln\s+Speed|Mill\s+Speed|Bucket\s+Speed|Screw\s+Speed|Required\s+Output\s+Speed|\bOUT\s+SPD\b|\bOUT\.\s*SPD\b|\bOUTPUT\s+SPD\b|\bRPM\b)(?:\s+(?:Limit|Range|Req|Requirement|Threshold))?\s*(?:>=|greater\s+than|min|minimum|should\s+be\s+greater\s+than|should\s+be\s*>=)\s*(\d+(?:\.\d+)?)/i,
+    /(?:min|minimum)\s+(?:Output\s+Speed|Required\s+Speed|Gearbox\s+Output\s+Speed|Agitator\s+Speed|Drum\s+Speed|Conveyor\s+Speed|Mixer\s+Speed|Shaft\s+Speed|Table\s+Speed|Roll\s+Speed|Kiln\s+Speed|Mill\s+Speed|Bucket\s+Speed|Screw\s+Speed|Required\s+Output\s+Speed|\bOUT\s+SPD\b|\bOUT\.\s*SPD\b|\bOUTPUT\s+SPD\b|\bRPM\b)(?:\s+(?:Limit|Range|Req|Requirement|Threshold))?\s*(?:of|is|was)?\s*[:=\s]*\s*(\d+(?:\.\d+)?)/i
+  ], undefined, 'outputSpeedMin', 'Min Output Speed Constraint');
+
   // Ratio
   matchValue([
     /(?:\bRatio\b|\bReduction\s+Ratio\b|\bGear\s+Ratio\b|\bOverall\s+Ratio\b|\bReduction\b|\bReduction\s+Number\b|\bTransmission\s+Ratio\b|\bReduction\s+Factor\b|\bReduction\s+Rate\b|\bi\b)\s*(?:is|of|was)?\s*[:=\s]*\s*(?:approximately|approx\.?|about|around|~)?\s*(\d+(?:\.\d+)?)\s*(?::\s*1)?/i,
@@ -149,25 +161,36 @@ export function parseInputsWithMetadata(text: string): ParserResult {
 
   // Power -> powerW
   matchValue([
-    /(?:Power|Motor\s+Power|Drive\s+Power|Motor\s+Rating|Motor\s+Capacity|Installed\s+Power|Connected\s+Load|Motor|\bPWR\b)\s*(?:is|of|was)?\s*[:=\s]*\s*(?:approximately|approx\.?|about|around|~)?\s*(\d+(?:\.\d+)?)(?![.\d])(?!\s*(?:RPM|r\/min|speed|poles?|hz|v|volts?))\s*(kW|HP|Kilowatt|Horsepower|h\.p\.)?/i,
-    /(\d+(?:\.\d+)?)(?![.\d])\s*(?:kW|HP|Kilowatt|Horsepower|h\.p\.)\s*(?:is|of|was)?\s*[:=\s]*\s*(?:Power|Motor\s+Power|Drive\s+Power|Motor\s+Rating|Motor\s+Capacity|Installed\s+Power|Connected\s+Load|Motor|\bPWR\b)?/i
+    /(?:Power|Motor\s+Power|Drive\s+Power|Motor\s+Rating|Motor\s+Capacity|Installed\s+Power|Connected\s+Load|Motor|\bPWR\b)\s*(?:is|of|was)?\s*[:=\s]*\s*(?:approximately|approx\.?|about|around|~)?\s*(\d+(?:\.\d+)?)(?![.\d])(?!\s*(?:RPM|r\/min|speed|poles?|hz|v|volts?))\s*(kW|HP|Kilowatt|Horsepower|h\.p\.|W|Watt|Watts)?/i,
+    /(\d+(?:\.\d+)?)(?![.\d])\s*(kW|HP|Kilowatt|Horsepower|h\.p\.|W|Watt|Watts)\s*(?:is|of|was)?\s*[:=\s]*\s*(?:Power|Motor\s+Power|Drive\s+Power|Motor\s+Rating|Motor\s+Capacity|Installed\s+Power|Connected\s+Load|Motor|\bPWR\b)?/i
   ], (v, match) => {
     const unit = (match[2] || '').toLowerCase();
     if (unit === 'hp' || unit === 'horsepower' || unit === 'h.p.') {
       return v * 745.7;
     }
+    if (unit === 'w' || unit === 'watt' || unit === 'watts') {
+      return v;
+    }
     return v * 1000; // Default to kW -> W
   }, 'powerW', 'Power');
 
+  // Motor HP -> motorHP
+  matchValue([
+    /(?:Motor\s+)?HP\s*[:=\s]*\s*(\d+(?:\.\d+)?)\s*(?:HP)?/i
+  ], undefined, 'motorHP', 'Motor HP');
+
   // Torque
   matchValue([
-    /(?<!input\s+|motor\s+|inlet\s+|drive\s+)(?:\bTorque\b|Output\s+Torque|Rated\s+Torque|Running\s+Torque|Load\s+Torque|Holding\s+Torque|Design\s+Torque|Peak\s+Torque|Breakout\s+Torque)\s*(?:is|of|was)?\s*[:=\s]*\s*(?:approximately|approx\.?|about|around|~)?\s*(\d+(?:\.\d+)?)\s*(N[·\-\.]?m|Newton[ \-]?meters?|kgf?[·\-\.]?m|kg[·\-\.]?m|lb[·\-\.]?ft|ft[·\-\.]?lbs?|lb[·\-\.]?in|in[·\-\.]?lbs?)?/i,
-    /(\d+(?:\.\d+)?)\s*(N[·\-\.]?m|Newton[ \-]?meters?|kgf?[·\-\.]?m|kg[·\-\.]?m|lb[·\-\.]?ft|ft[·\-\.]?lbs?|lb[·\-\.]?in|in[·\-\.]?lbs?)\s*(?:is|of|was)?\s*[:=\s]*\s*(?<!input\s+|motor\s+|inlet\s+|drive\s+)(?:\bTorque\b|Output\s+Torque|Rated\s+Torque|Running\s+Torque|Load\s+Torque|Holding\s+Torque|Design\s+Torque|Peak\s+Torque|Breakout\s+Torque)/i
+    /(?<!input\s+|motor\s+|inlet\s+|drive\s+)(?:\bTorque\b|Output\s+Torque|Rated\s+Torque|Running\s+Torque|Load\s+Torque|Holding\s+Torque|Design\s+Torque|Peak\s+Torque|Breakout\s+Torque)\s*(?:is|of|was)?\s*[:=\s]*\s*(?:approximately|approx\.?|about|around|~)?\s*(\d+(?:\.\d+)?)\s*(k?N[·\-\.\s]?m|Newton[ \-]?meters?|kilonewton[ \-]?meters?|kgf?[·\-\.\s]?m|lbs?[·\-\.\s]?(?:ft|in)|(?:ft|in)[·\-\.\s]?lbs?)?/i,
+    /(\d+(?:\.\d+)?)\s*(k?N[·\-\.\s]?m|Newton[ \-]?meters?|kilonewton[ \-]?meters?|kgf?[·\-\.\s]?m|lbs?[·\-\.\s]?(?:ft|in)|(?:ft|in)[·\-\.\s]?lbs?)\s*(?:is|of|was)?\s*[:=\s]*\s*(?<!input\s+|motor\s+|inlet\s+|drive\s+)(?:\bTorque\b|Output\s+Torque|Rated\s+Torque|Running\s+Torque|Load\s+Torque|Holding\s+Torque|Design\s+Torque|Peak\s+Torque|Breakout\s+Torque)/i
   ], (v, match) => {
     const unit = (match[2] || '').toLowerCase();
-    if (unit.includes('kgf') || unit.includes('kg')) return v * 9.80665;
-    if (unit.includes('ft') || unit.includes('lb')) return v * 1.35581794833;
-    if (unit.includes('in')) return v * 0.112984829;
+    if (unit.startsWith('kn') || unit.includes('kilonewton')) return v * 1000;
+    if (unit.includes('kgf') || unit.includes('kg')) return v * 9.81;
+    if (unit.includes('ft') || unit.includes('lb')) {
+      if (unit.includes('in')) return v * 0.112984829;
+      return v * 1.35581794833;
+    }
     return v;
   }, 'outputTorqueNm', 'Output Torque');
 
@@ -223,8 +246,8 @@ export function parseInputsWithMetadata(text: string): ParserResult {
 
   // 4. Hoist & Winch Inputs
   matchValue([
-    /(?:hoist\s+speed|lifting\s+speed|liftingSpeed|hoistSpeed|lift\s+speed)\s*(?:is|of|was)?\s*[:\s=]*\s*(\d+\.?\d*)\s*(m\/s|m\/min|meters\/min|meters\/minute)?/i,
-    /(\d+\.?\d*)\s*(m\/s|m\/min|meters\/min|meters\/minute)\s+(?:hoist|lift|lifting)/i
+    /(?:hoist\s+speed|lifting\s+speed|liftingSpeed|hoistSpeed|lift\s+speed|travel\s+speed|travelSpeed)\s*(?:is|of|was)?\s*[:\s=]*\s*(\d+\.?\d*)\s*(m\/s|m\/min|meters\/min|meters\/minute)?/i,
+    /(\d+\.?\d*)\s*(m\/s|m\/min|meters\/min|meters\/minute)\s+(?:hoist|lift|lifting|travel)/i
   ], (v, match) => {
     const unit = (match[2] || '').toLowerCase();
     if (unit.includes('min')) {
@@ -269,8 +292,8 @@ export function parseInputsWithMetadata(text: string): ParserResult {
   ], (v, match) => {
     const unit = (match[2] || '').toLowerCase();
     if (unit === 'kn') return v * 1000;
-    if (unit === 'ton' || unit === 'tonne' || unit === 't' || unit === 'tons' || unit === 'tonnes') return v * 9806.65;
-    if (unit === 'kg') return v * 9.80665;
+    if (unit === 'ton' || unit === 'tonne' || unit === 't' || unit === 'tons' || unit === 'tonnes') return v * 9810;
+    if (unit === 'kg') return v * 9.81;
     return v;
   }, 'hoistLoad_N', 'Hoist Load Force');
 
@@ -284,13 +307,16 @@ export function parseInputsWithMetadata(text: string): ParserResult {
 
   // Input Torque
   matchValue([
-    /(?:input\s+torque|motor\s+torque|drive\s+torque)\s*(?:is|of|was)?\s*[:=\s]*\s*(\d+(?:\.\d+)?)\s*(N[·\-\.]?m|Newton[ \-]?meters?|kgf?[·\-\.]?m|kg[·\-\.]?m|lb[·\-\.]?ft|ft[·\-\.]?lbs?|lb[·\-\.]?in|in[·\-\.]?lbs?)?/i,
-    /(\d+(?:\.\d+)?)\s*(N[·\-\.]?m|Newton[ \-]?meters?|kgf?[·\-\.]?m|kg[·\-\.]?m|lb[·\-\.]?ft|ft[·\-\.]?lbs?|lb[·\-\.]?in|in[·\-\.]?lbs?)\s*(?:is|of|was)?\s*[:=\s]*\s*(?:input\s+torque|motor\s+torque|drive\s+torque)/i
+    /(?:input\s+torque|motor\s+torque|drive\s+torque)\s*(?:is|of|was)?\s*[:=\s]*\s*(\d+(?:\.\d+)?)\s*(k?N[·\-\.\s]?m|Newton[ \-]?meters?|kilonewton[ \-]?meters?|kgf?[·\-\.\s]?m|lbs?[·\-\.\s]?(?:ft|in)|(?:ft|in)[·\-\.\s]?lbs?)?/i,
+    /(\d+(?:\.\d+)?)\s*(k?N[·\-\.\s]?m|Newton[ \-]?meters?|kilonewton[ \-]?meters?|kgf?[·\-\.\s]?m|lbs?[·\-\.\s]?(?:ft|in)|(?:ft|in)[·\-\.\s]?lbs?)\s*(?:is|of|was)?\s*[:=\s]*\s*(?:input\s+torque|motor\s+torque|drive\s+torque)/i
   ], (v, match) => {
     const unit = (match[2] || '').toLowerCase();
-    if (unit.includes('kgf') || unit.includes('kg')) return v * 9.80665;
-    if (unit.includes('ft') || unit.includes('lb')) return v * 1.35581794833;
-    if (unit.includes('in')) return v * 0.112984829;
+    if (unit.startsWith('kn') || unit.includes('kilonewton')) return v * 1000;
+    if (unit.includes('kgf') || unit.includes('kg')) return v * 9.81;
+    if (unit.includes('ft') || unit.includes('lb')) {
+      if (unit.includes('in')) return v * 0.112984829;
+      return v * 1.35581794833;
+    }
     return v;
   }, 'inputTorqueNm', 'Input Torque');
 
@@ -318,13 +344,26 @@ export function parseInputsWithMetadata(text: string): ParserResult {
     /(?:power\s+factor|PF)\s*[:\s=]*\s*(\d+\.?\d*)/i
   ], undefined, 'powerFactor', 'Power Factor');
 
-  matchValue([
+  const motorEffVal = matchValue([
     /efficiency\s*[:\s=]*\s*(\d+\.?\d*)\s*(%)?/i
   ], (v, match) => {
     const isPercent = match[2] === '%';
     if (isPercent || v > 1.0) return v / 100;
     return v;
   }, 'motorEfficiency', 'Motor Efficiency');
+  if (motorEffVal === null) {
+    values.motorEfficiency = 1.0;
+    nodes.motorEfficiency = {
+      name: 'Motor Efficiency',
+      value: 1.0,
+      type: 'SUGGESTED',
+      source: 'Engine Default',
+      formula: 'N/A',
+      calculationSteps: 'Assumed 1.0 default motor efficiency',
+      confidence: 'Medium',
+      reasoning: 'Default 100% motor efficiency assumed.'
+    };
+  }
 
   // Bucket Elevator parameters
   matchValue([
@@ -798,7 +837,7 @@ export const derivationRules: DerivationRule[] = [
     formula: (inputs) => {
       const { flowRate_m3_s, pumpHead_m, pumpEfficiency, liquidDensity_kg_m3 } = inputs;
       if (pumpEfficiency <= 0) return null;
-      return (liquidDensity_kg_m3 * 9.80665 * flowRate_m3_s * pumpHead_m) / pumpEfficiency;
+      return (liquidDensity_kg_m3 * 9.81 * flowRate_m3_s * pumpHead_m) / pumpEfficiency;
     }
   },
   {
@@ -1091,18 +1130,23 @@ export const derivationRules: DerivationRule[] = [
   },
   {
     id: 'DR-POWER-001',
-    name: 'Torque and Speed to Power (Standard)',
+    name: 'Output Torque and Speed to Input Power',
     category: 'Power',
     requiredInputs: ['outputTorqueNm', 'outputRadS'],
     outputParameter: 'powerW',
     confidence: 'HIGH',
     autoCalculate: true,
-    formulaString: 'P = T × ω',
-    auditDescription: 'Derives power from torque and rotational speed directly using pure physical relation P = Tω.',
+    formulaString: 'P_in = T_out × ω_out / η',
+    auditDescription: 'Derives required input shaft power from output load torque, speed, and efficiency.',
     formula: (inputs) => {
-      const { outputTorqueNm, outputRadS } = inputs;
+      const { outputTorqueNm, outputRadS, efficiency, stages, totalRatio } = inputs;
       if (outputRadS <= 0) return null;
-      return outputTorqueNm * outputRadS;
+      let stagesCount = stages;
+      if (stagesCount === undefined && totalRatio) {
+        stagesCount = totalRatio <= 10.26 ? 1 : totalRatio <= 77.77 ? 2 : totalRatio <= 393.5 ? 3 : 4;
+      }
+      const effVal = efficiency !== undefined ? efficiency : Math.pow(0.97, stagesCount || 1);
+      return (outputTorqueNm * outputRadS) / effVal;
     }
   },
   {
@@ -1130,7 +1174,7 @@ export const derivationRules: DerivationRule[] = [
     formulaString: 'P = Load_kg × g × Speed',
     auditDescription: 'Derives power from load in kg and velocity in m/s.',
     formula: (inputs) => {
-      return inputs.load_kg * 9.80665 * inputs.linearSpeed_m_s;
+      return inputs.load_kg * 9.81 * inputs.linearSpeed_m_s;
     }
   },
   {
@@ -1194,7 +1238,7 @@ export const derivationRules: DerivationRule[] = [
     formula: (inputs) => {
       const { bucketElevatorCapacity_kg_s, bucketElevatorLiftHeight_m, motorEfficiency } = inputs;
       if (bucketElevatorCapacity_kg_s <= 0 || bucketElevatorLiftHeight_m <= 0 || motorEfficiency <= 0) return null;
-      return (bucketElevatorCapacity_kg_s * 9.80665 * bucketElevatorLiftHeight_m) / motorEfficiency;
+      return (bucketElevatorCapacity_kg_s * 9.81 * bucketElevatorLiftHeight_m) / motorEfficiency;
     }
   },
   {
@@ -1208,7 +1252,7 @@ export const derivationRules: DerivationRule[] = [
     formulaString: 'P = Load_kg × g × v_hoist',
     auditDescription: 'Derives power from load in kg and hoist lift speed in m/s.',
     formula: (inputs) => {
-      return inputs.load_kg * 9.80665 * inputs.hoistSpeed_m_s;
+      return inputs.load_kg * 9.81 * inputs.hoistSpeed_m_s;
     }
   },
   {
@@ -1235,12 +1279,17 @@ export const derivationRules: DerivationRule[] = [
     outputParameter: 'outputTorqueNm',
     confidence: 'MEDIUM',
     autoCalculate: true,
-    formulaString: 'T = P / ω',
-    auditDescription: 'Calculates standard output torque from power and speed.',
+    formulaString: 'T_out = P_in × η / ω_out',
+    auditDescription: 'Calculates standard output torque from input power, output speed, and efficiency.',
     formula: (inputs) => {
-      const { powerW, outputRadS } = inputs;
+      const { powerW, outputRadS, efficiency, stages, totalRatio } = inputs;
       if (outputRadS <= 0) return null;
-      return powerW / outputRadS;
+      let stagesCount = stages;
+      if (stagesCount === undefined && totalRatio) {
+        stagesCount = totalRatio <= 10.26 ? 1 : totalRatio <= 77.77 ? 2 : totalRatio <= 393.5 ? 3 : 4;
+      }
+      const effVal = efficiency !== undefined ? efficiency : Math.pow(0.97, stagesCount || 1);
+      return (powerW * effVal) / outputRadS;
     }
   },
   {
@@ -1397,12 +1446,17 @@ export const derivationRules: DerivationRule[] = [
     outputParameter: 'outputRadS',
     confidence: 'MEDIUM',
     autoCalculate: true,
-    formulaString: 'ω = P / T',
-    auditDescription: 'Calculates angular speed in rad/s from power in Watts and torque in Nm.',
+    formulaString: 'ω_out = P_in × η / T_out',
+    auditDescription: 'Calculates angular speed in rad/s from input power in Watts, output torque in Nm, and efficiency.',
     formula: (inputs) => {
-      const { powerW, outputTorqueNm } = inputs;
+      const { powerW, outputTorqueNm, efficiency, stages, totalRatio } = inputs;
       if (outputTorqueNm <= 0) return null;
-      return powerW / outputTorqueNm;
+      let stagesCount = stages;
+      if (stagesCount === undefined && totalRatio) {
+        stagesCount = totalRatio <= 10.26 ? 1 : totalRatio <= 77.77 ? 2 : totalRatio <= 393.5 ? 3 : 4;
+      }
+      const effVal = efficiency !== undefined ? efficiency : Math.pow(0.97, stagesCount || 1);
+      return (powerW * effVal) / outputTorqueNm;
     }
   },
   {
@@ -1483,6 +1537,30 @@ export const derivationRules: DerivationRule[] = [
       }
       const effVal = efficiency !== undefined ? efficiency : Math.pow(0.97, stagesCount || 1);
       return outputTorqueNm / (totalRatio * effVal);
+    }
+  },
+  {
+    id: 'DR-TORQUE-008',
+    name: 'Input Torque and Ratio to Output Torque',
+    category: 'Torque',
+    requiredInputs: ['inputTorqueNm', 'totalRatio'],
+    outputParameter: 'outputTorqueNm',
+    confidence: 'HIGH',
+    autoCalculate: true,
+    formulaString: 'Tout = Tin * Ratio * η',
+    auditDescription: 'Derives output load torque from input motor torque, gearbox ratio, and efficiency.',
+    formula: (inputs) => {
+      const { inputTorqueNm, totalRatio, efficiency, stages } = inputs;
+      if (totalRatio <= 0) return null;
+      let stagesCount = stages;
+      if (stagesCount === undefined) {
+        if (totalRatio <= 10.26) stagesCount = 1;
+        else if (totalRatio <= 77.77) stagesCount = 2;
+        else if (totalRatio <= 393.5) stagesCount = 3;
+        else stagesCount = 4;
+      }
+      const effVal = efficiency !== undefined ? efficiency : Math.pow(0.97, stagesCount || 1);
+      return inputTorqueNm * totalRatio * effVal;
     }
   }
 ];
@@ -1645,7 +1723,7 @@ export class MissingParameterResolutionEngine {
                   traceType = 'ASSUMED_VALUE';
                 }
 
-                const hasUsedAssumedEfficiency = (rule.id === 'DR-015' || rule.id === 'DR-RATIO-004' || rule.id === 'DR-TORQUE-007') && !userProvidedKeys.has('efficiency');
+                const hasUsedAssumedEfficiency = (rule.id === 'DR-015' || rule.id === 'DR-RATIO-004' || rule.id === 'DR-TORQUE-007' || rule.id === 'DR-TORQUE-008') && !userProvidedKeys.has('efficiency');
                 if (hasUsedAssumedEfficiency) {
                   traceType = 'ASSUMED_VALUE';
                   if (traceConf !== 'LOW') {

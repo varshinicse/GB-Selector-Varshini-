@@ -54,7 +54,7 @@ describe('Application Knowledge Engine - Parameter & Block Analysis', () => {
     
     expect(res.applicationId).toBe('PUMP');
     expect(res.isBlocked).toBe(false); // Can derive power using DR-009!
-    expect(res.resolvedParameters.powerKW).toBeCloseTo(31.521, 3);
+    expect(res.resolvedParameters.powerKW).toBeCloseTo(31.532, 3);
   });
 
   it('should NOT block Pump if both target speed and ratio are missing', () => {

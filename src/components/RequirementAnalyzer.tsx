@@ -18,7 +18,7 @@ import {
 } from '../services/engineeringReasoningEngine';
 import { 
   verifyEngineeringReport, 
-  VerificationReport 
+  VerificationReport
 } from '../services/verificationEngine';
 import { exportToPDF, exportToExcel } from '../services/reportExportService';
 import { PowerTorqueEngine } from '../services/calculations';
@@ -302,7 +302,7 @@ export const RequirementAnalyzer: React.FC<RequirementAnalyzerProps> = ({ onAuto
     const {
       projectName, applicationType, dutyType, operatingHours, loadType, environment,
       powerKW, motorHP, motorPoles, inputRPM, outputRPM, totalRatio, stages, serviceFactor,
-      stageEvaluationTrace, inputTorque, stageTraces, finalRecommendation, validation
+      stageEvaluationTrace, inputTorque, stageTraces, finalRecommendation, validation, outputPowerKW
     } = reasoningResult;
 
     const dateStr = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
@@ -413,12 +413,21 @@ export const RequirementAnalyzer: React.FC<RequirementAnalyzerProps> = ({ onAuto
           </thead>
           <tbody>
             <tr>
-              <td><strong>Power</strong></td>
+              <td><strong>Input Power</strong></td>
               <td>${powerKW.value} kW</td>
               <td><span class="badge badge-${powerKW.type.toLowerCase()}">${powerKW.type}</span></td>
               <td>${powerKW.source}</td>
               <td>${powerKW.reasoning}</td>
             </tr>
+            ${outputPowerKW && outputPowerKW.value !== null && outputPowerKW.value !== undefined ? `
+            <tr>
+              <td><strong>Output Power</strong></td>
+              <td>${outputPowerKW.value.toFixed(2)} kW</td>
+              <td><span class="badge badge-${outputPowerKW.type.toLowerCase()}">${outputPowerKW.type}</span></td>
+              <td>${outputPowerKW.source}</td>
+              <td>${outputPowerKW.reasoning}</td>
+            </tr>
+            ` : ''}
             <tr>
               <td><strong>Motor HP</strong></td>
               <td>${motorHP.value ? `${motorHP.value} HP` : 'N/A'}</td>
@@ -814,6 +823,8 @@ export const RequirementAnalyzer: React.FC<RequirementAnalyzerProps> = ({ onAuto
 
                 {/* Tab Contents */}
                 <div className="flex-1 overflow-y-auto max-h-[380px] pr-1 space-y-4">
+
+
                     {/* TAB 1: RECOMMENDATION */}
                   {activeTab === 'rec' && (
                     <div className="space-y-4">
@@ -907,7 +918,7 @@ export const RequirementAnalyzer: React.FC<RequirementAnalyzerProps> = ({ onAuto
                             <div className="space-y-1">
                               <span className="text-[9px] font-bold text-slate-450 uppercase tracking-widest font-mono">Recommended output model</span>
                               <h4 className="text-xl font-black text-[#ff8c00] tracking-wide">
-                                {reasoningResult.validation.isValid && reasoningResult.stageTraces.length > 0
+                                {reasoningResult.stageTraces.length > 0
                                   ? reasoningResult.stageTraces[reasoningResult.stageTraces.length - 1].selectedGearbox.size
                                   : 'Review Warnings'}
                               </h4>
@@ -917,8 +928,14 @@ export const RequirementAnalyzer: React.FC<RequirementAnalyzerProps> = ({ onAuto
                               </p>
                             </div>
                             <div className="text-right">
-                              <Badge className={`${reasoningResult.validation.isValid && reasoningResult.stageTraces.every(t => t.safetyFactor >= 1.0) ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-500 hover:bg-red-600'} text-white font-extrabold px-3 py-1 text-xs shadow`}>
-                                {reasoningResult.validation.isValid && reasoningResult.stageTraces.every(t => t.safetyFactor >= 1.0) ? '⚡ Drive Compliant' : '⚠ Action Required'}
+                              <Badge className={`${
+                                !!(reasoningResult?.inputTorqueNm?.mismatch || reasoningResult?.outputTorqueNm?.mismatch)
+                                  ? 'bg-amber-600 hover:bg-amber-700'
+                                  : (reasoningResult.validation.isValid && reasoningResult.stageTraces.every(t => t.safetyFactor >= 1.0) ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-500 hover:bg-red-600')
+                              } text-white font-extrabold px-3 py-1 text-xs shadow`}>
+                                {!!(reasoningResult?.inputTorqueNm?.mismatch || reasoningResult?.outputTorqueNm?.mismatch)
+                                  ? '⚠ Selection Generated With Validation Warnings'
+                                  : (reasoningResult.validation.isValid && reasoningResult.stageTraces.every(t => t.safetyFactor >= 1.0) ? '⚡ Drive Compliant' : '⚠ Action Required')}
                               </Badge>
                               <div className="text-[10.5px] font-bold text-slate-400 mt-1">
                                 Stages: {reasoningResult.stages.value} Planetary
@@ -927,7 +944,7 @@ export const RequirementAnalyzer: React.FC<RequirementAnalyzerProps> = ({ onAuto
                           </div>
 
                           {/* Stage flow visualizer */}
-                          {reasoningResult.validation.isValid && (
+                          {reasoningResult.stageTraces.length > 0 && (
                             <div className="bg-slate-100/50 border border-slate-200 p-4 rounded-xl space-y-2">
                               <div className="text-[10px] font-bold uppercase text-slate-450 tracking-wider flex items-center gap-1 font-mono">
                                 <Settings className="h-3 w-3" />
@@ -954,10 +971,94 @@ export const RequirementAnalyzer: React.FC<RequirementAnalyzerProps> = ({ onAuto
                                   <div className="text-[8px] font-extrabold text-slate-450 uppercase">Output Drive</div>
                                   <div className="font-extrabold text-white mt-0.5">{reasoningResult.outputRPM.value.toFixed(1)} RPM</div>
                                   <div className="text-[8.5px] font-bold text-[#ff8c00] mt-0.5">{PowerTorqueEngine.formatTorqueExact(reasoningResult.overallOutputTorque)} N·m</div>
+                                  {reasoningResult.outputPowerKW && reasoningResult.outputPowerKW.value !== null && (
+                                    <div className="text-[8.5px] font-bold text-[#ff8c00] mt-0.5">{reasoningResult.outputPowerKW.value.toFixed(2)} kW</div>
+                                  )}
                                 </div>
                               </div>
                             </div>
                           )}
+
+                          {/* Warning Panel */}
+                          {(() => {
+                            const mismatches = reasoningResult.validation.mismatches || [];
+                            if (mismatches.length === 0) return null;
+
+                            const highestSeverity = mismatches.reduce((acc, m) => {
+                              if (m.severity === 'Constraint' || m.severity === 'Critical') return 'Critical';
+                              if (m.severity === 'Moderate' && acc !== 'Critical') return 'Moderate';
+                              return acc;
+                            }, 'Minor' as 'Minor' | 'Moderate' | 'Critical');
+
+                            return (
+                              <div className={`border p-4.5 rounded-xl space-y-4 shadow-xs text-xs ${
+                                highestSeverity === 'Critical' ? 'bg-red-50/60 border-red-200 text-red-800' :
+                                highestSeverity === 'Moderate' ? 'bg-orange-50/60 border-orange-200 text-orange-950' :
+                                'bg-amber-50/60 border-amber-200 text-amber-800'
+                              }`}>
+                                <div className="flex items-start gap-2.5">
+                                  <AlertTriangle className={`h-5 w-5 shrink-0 mt-0.5 ${
+                                    highestSeverity === 'Critical' ? 'text-red-600' :
+                                    highestSeverity === 'Moderate' ? 'text-orange-600' :
+                                    'text-amber-600'
+                                  }`} />
+                                  <div className="space-y-0.5">
+                                    <div className="font-extrabold text-slate-900 text-sm">
+                                      Engineering Consistency Validation
+                                    </div>
+                                    <p className="text-[10.5px] text-slate-500 font-bold">
+                                      Conflicts detected between specified requirements and calculated values:
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                  {mismatches.map((m, idx) => {
+                                    const isConstraint = m.severity === 'Constraint';
+                                    return (
+                                      <div key={idx} className="bg-white/80 border border-slate-200/80 p-3.5 rounded-xl space-y-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="font-extrabold text-slate-800 text-xs flex items-center gap-1.5">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-slate-400 shrink-0" />
+                                            {m.propertyName} {isConstraint ? 'Violation' : 'Mismatch'}
+                                          </span>
+                                          <span className={`inline-flex items-center text-[9px] font-black px-2 py-0.5 rounded-full border ${
+                                            m.severity === 'Minor' ? 'bg-amber-100 text-amber-900 border-amber-200' :
+                                            m.severity === 'Moderate' ? 'bg-orange-100 text-orange-900 border-orange-200' :
+                                            'bg-red-100 text-red-800 border-red-200'
+                                          }`}>
+                                            {isConstraint ? '🔴 Constraint' : `${m.severity} Deviation`}
+                                          </span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-[11px] font-medium">
+                                          <div>
+                                            <span className="text-[8px] uppercase tracking-wider text-slate-400 font-bold block">Specified</span>
+                                            <span className="text-slate-700 font-black">{m.specifiedValue}</span>
+                                          </div>
+                                          <div>
+                                            <span className="text-[8px] uppercase tracking-wider text-slate-400 font-bold block">Calculated</span>
+                                            <span className="text-slate-700 font-black">{m.calculatedValue}</span>
+                                          </div>
+                                        </div>
+                                        {!isConstraint && m.deviationPercentage !== undefined && (
+                                          <div className="text-[10px] text-slate-500 font-bold">
+                                            Deviation: <span className="font-mono text-slate-700">{m.deviationPercentage.toFixed(2)}%</span>
+                                          </div>
+                                        )}
+                                        <p className="text-[10.5px] text-slate-650 font-semibold leading-relaxed pt-0.5">
+                                          {m.message}
+                                        </p>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+
+                                <div className="text-[10px] text-slate-500 font-black border-t border-slate-200/50 pt-2.5">
+                                  Please verify the RFQ data sheets and input specifications to resolve these inconsistencies.
+                                </div>
+                              </div>
+                            );
+                          })()}
 
                           {/* Text Output */}
                           <div className="text-xs text-slate-650 leading-relaxed font-medium bg-white border border-slate-150 p-4 rounded-xl shadow-xs whitespace-pre-line">
@@ -1045,13 +1146,12 @@ export const RequirementAnalyzer: React.FC<RequirementAnalyzerProps> = ({ onAuto
                             <tr className="bg-slate-900 text-slate-200">
                               <th className="p-3 font-extrabold">Parameter</th>
                               <th className="p-3 font-extrabold text-center">Value</th>
-                              <th className="p-3 font-extrabold text-center">Classification</th>
-                              <th className="p-3 font-extrabold text-center">Confidence</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-150 bg-white">
                             {[
                               reasoningResult.powerKW,
+                              reasoningResult.outputPowerKW,
                               reasoningResult.motorHP,
                               reasoningResult.motorPoles,
                               reasoningResult.inputRPM,
@@ -1060,64 +1160,42 @@ export const RequirementAnalyzer: React.FC<RequirementAnalyzerProps> = ({ onAuto
                               reasoningResult.stages,
                               reasoningResult.serviceFactor,
                               reasoningResult.inputTorqueNm,
-                              reasoningResult.outputTorqueNm,
-                              reasoningResult.shaftSpeedRPM,
-                              reasoningResult.shaftTorqueNm
+                              reasoningResult.outputTorqueNm
                             ].filter((p) => p !== undefined && p !== null).map((p, idx) => {
                               const isNull = p.value === null || p.value === undefined || (typeof p.value === 'number' && isNaN(p.value));
                               return (
                                 <tr key={idx} className="hover:bg-slate-50/50">
                                   <td className="p-3">
                                     <div className="font-extrabold text-slate-800">{p.name}</div>
-                                    <div className="text-[10px] text-slate-450 mt-0.5 font-medium leading-snug">
-                                      {p.reasoning}
-                                    </div>
-                                    {p.detectedText && (
-                                      <div className="text-[9px] bg-slate-50 border border-slate-150 px-2 py-0.5 rounded mt-1.5 inline-block text-slate-500 font-mono">
-                                        Detected text: "${p.detectedText}"
-                                      </div>
-                                    )}
                                   </td>
-                                  <td className="p-3 text-center font-extrabold text-slate-900 bg-slate-50/20 whitespace-nowrap">
+                                  <td className="p-3 text-center font-extrabold text-slate-900 bg-slate-50/20">
                                     {isNull ? 'UNRESOLVED' : (
-                                      p.name.includes('Ratio') 
-                                        ? `${p.value!.toFixed(2)}:1`
-                                        : p.name.includes('Speed') || p.name.includes('RPM')
-                                        ? `${p.value! % 1 === 0 ? p.value! : p.value!.toFixed(2)} RPM`
-                                        : p.name.includes('Power')
-                                        ? `${p.value! % 1 === 0 ? p.value! : p.value!.toFixed(2)} kW`
-                                        : p.name.includes('HP')
-                                        ? `${p.value! % 1 === 0 ? p.value! : p.value!.toFixed(2)} HP`
-                                        : p.name.includes('Torque')
-                                        ? `${PowerTorqueEngine.formatTorqueExact(p.value!)} N·m`
-                                        : p.value
+                                      p.mismatch ? (
+                                        <div className="flex flex-col items-center justify-center text-center space-y-1 py-1">
+                                          <div className="text-red-600 font-black text-xs flex items-center gap-1 justify-center">
+                                            <span>⚠ {PowerTorqueEngine.formatTorqueExact(p.mismatch.extractedValue)} N·m (Specified)</span>
+                                          </div>
+                                          <div className="text-slate-500 font-bold text-[10.5px]">
+                                            Calc: {PowerTorqueEngine.formatTorqueExact(p.mismatch.calculatedValue)} N·m
+                                          </div>
+                                          <div className="text-red-500 font-extrabold text-[9.5px] uppercase tracking-wider font-mono bg-red-50 border border-red-100 rounded px-1.5 py-0.5">
+                                            {p.mismatch.deviationPercentage.toFixed(1)}% Mismatch
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        p.name.includes('Ratio') 
+                                          ? `${p.value!.toFixed(2)}:1`
+                                          : p.name.includes('Speed') || p.name.includes('RPM')
+                                          ? `${p.value! % 1 === 0 ? p.value! : p.value!.toFixed(2)} RPM`
+                                          : p.name.includes('Power')
+                                          ? `${p.value! % 1 === 0 ? p.value! : p.value!.toFixed(2)} kW`
+                                          : p.name.includes('HP')
+                                          ? `${p.value! % 1 === 0 ? p.value! : p.value!.toFixed(2)} HP`
+                                          : p.name.includes('Torque')
+                                          ? `${PowerTorqueEngine.formatTorqueExact(p.value!)} N·m`
+                                          : p.value
+                                      )
                                     )}
-                                  </td>
-                                  <td className="p-3 text-center">
-                                    <Badge className={`font-black text-[8.5px] py-0.5 px-2 rounded whitespace-nowrap shadow-xs ${
-                                      p.type === 'EXTRACTED'
-                                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-150'
-                                        : p.type === 'CALCULATED'
-                                        ? 'bg-blue-50 text-blue-800 border border-blue-150'
-                                        : p.type === 'DERIVED'
-                                        ? 'bg-purple-50 text-purple-800 border border-purple-150'
-                                        : p.type === 'SUGGESTED'
-                                        ? 'bg-amber-50 text-amber-800 border border-amber-150'
-                                        : 'bg-slate-100 text-slate-650'
-                                    }`}>
-                                      {p.type}
-                                    </Badge>
-                                  </td>
-                                  <td className="p-3 text-center">
-                                    <Badge className={`font-extrabold text-[9px] py-0.5 px-2 rounded-full whitespace-nowrap shadow-xs ${
-                                      p.confidence === 'High'
-                                        ? 'bg-emerald-100 border border-emerald-250 text-emerald-700'
-                                        : p.confidence === 'Medium'
-                                        ? 'bg-amber-100 border border-amber-250 text-amber-700'
-                                        : 'bg-red-100 border border-red-250 text-red-750'
-                                    }`}>
-                                      {p.confidence}
-                                    </Badge>
                                   </td>
                                 </tr>
                               );
@@ -1182,16 +1260,38 @@ export const RequirementAnalyzer: React.FC<RequirementAnalyzerProps> = ({ onAuto
                             {expandedAccordion.step2 && (
                               <div className="mt-3 space-y-3 border-t border-slate-100 pt-2.5">
                                 {/* HP to kW Formula Card */}
-                                <div className="bg-slate-50 border-l-2 border-[#ff8c00] p-2.5 rounded-r-lg font-mono text-[11px] font-bold text-slate-800">
-                                  Power Conversion Formula:<br/>
-                                  P_kW = HP × 0.7457<br/>
-                                  Steps: {reasoningResult.motorHP.calculationSteps}
-                                </div>
+                                {reasoningResult.motorHP.value !== null && (
+                                  <div className="bg-slate-50 border-l-2 border-[#ff8c00] p-2.5 rounded-r-lg font-mono text-[11px] font-bold text-slate-800">
+                                    Power Conversion Formula:<br/>
+                                    P_kW = HP × 0.7457<br/>
+                                    Steps: {reasoningResult.motorHP.calculationSteps}
+                                  </div>
+                                )}
                                 <div className="bg-slate-50 border-l-2 border-[#ff8c00] p-2.5 rounded-r-lg font-mono text-[11px] font-bold text-slate-800">
                                   Poles-to-Speed Slip Mapping:<br/>
                                   Formula: N_in = f(Poles)<br/>
                                   Steps: {reasoningResult.inputRPM.calculationSteps}
                                 </div>
+                                {/* Input Power calculation details */}
+                                {reasoningResult.powerKW && (
+                                  <div className="bg-slate-50 border-l-2 border-indigo-500 p-2.5 rounded-r-lg font-mono text-[11px] font-bold text-slate-800 space-y-1">
+                                    <div className="text-indigo-600 font-extrabold uppercase text-[9px] tracking-wide">Gearbox Input Power Calculation</div>
+                                    <div>Source: {reasoningResult.powerKW.source}</div>
+                                    <div>Formula: {reasoningResult.powerKW.formula !== 'N/A' ? reasoningResult.powerKW.formula : 'Given / Direct Input'}</div>
+                                    <div>Steps: {reasoningResult.powerKW.calculationSteps}</div>
+                                    <div className="text-[10px] text-slate-500 font-semibold leading-relaxed">Justification: {reasoningResult.powerKW.reasoning}</div>
+                                  </div>
+                                )}
+                                {/* Output Power calculation details */}
+                                {reasoningResult.outputPowerKW && reasoningResult.outputPowerKW.value !== null && (
+                                  <div className="bg-slate-50 border-l-2 border-emerald-500 p-2.5 rounded-r-lg font-mono text-[11px] font-bold text-slate-800 space-y-1">
+                                    <div className="text-emerald-600 font-extrabold uppercase text-[9px] tracking-wide">Gearbox Output Power Calculation</div>
+                                    <div>Source: {reasoningResult.outputPowerKW.source}</div>
+                                    <div>Formula: {reasoningResult.outputPowerKW.formula}</div>
+                                    <div>Steps: {reasoningResult.outputPowerKW.calculationSteps}</div>
+                                    <div className="text-[10px] text-slate-500 font-semibold leading-relaxed">Justification: {reasoningResult.outputPowerKW.reasoning}</div>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>

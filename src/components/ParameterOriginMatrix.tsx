@@ -7,6 +7,7 @@
 import React from 'react';
 import { AlertTriangle, HelpCircle, Cpu, BookOpen, Calculator } from 'lucide-react';
 import { EngineeringReport, AuditParameterNode } from '../services/engineeringReasoningEngine';
+import { PowerTorqueEngine } from '../services/calculations';
 
 interface ParameterOriginMatrixProps {
   report: EngineeringReport;
@@ -103,9 +104,23 @@ function ParameterRow({ node, label, unit }: { node: AuditParameterNode<any>; la
       </td>
       {/* Value */}
       <td className="py-2.5 px-3">
-        <span className={`text-xs font-black ${node.value != null ? 'text-slate-900' : 'text-slate-400'}`}>
-          {displayVal}
-        </span>
+        {node.mismatch ? (
+          <div className="flex flex-col text-left space-y-1 py-1">
+            <span className="text-red-600 font-black text-xs flex items-center gap-1">
+              ⚠ {PowerTorqueEngine.formatTorqueExact(node.mismatch.extractedValue)}{unit ? ` ${unit}` : ''} (Specified)
+            </span>
+            <span className="text-slate-500 font-bold text-[10px]">
+              Calc: {PowerTorqueEngine.formatTorqueExact(node.mismatch.calculatedValue)}{unit ? ` ${unit}` : ''}
+            </span>
+            <span className="inline-block text-red-500 font-extrabold text-[9px] uppercase tracking-wider font-mono bg-red-50 border border-red-100 rounded px-1.5 py-0.5 w-max">
+              {node.mismatch.deviationPercentage.toFixed(1)}% Mismatch
+            </span>
+          </div>
+        ) : (
+          <span className={`text-xs font-black ${node.value != null ? 'text-slate-900' : 'text-slate-400'}`}>
+            {displayVal}
+          </span>
+        )}
       </td>
       {/* Type badge */}
       <td className="py-2.5 px-3">
@@ -198,7 +213,8 @@ export const ParameterOriginMatrix: React.FC<ParameterOriginMatrixProps> = ({ re
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-slate-100">
-            <ParameterRow node={report.powerKW} label="Power" unit="kW" />
+            <ParameterRow node={report.powerKW} label="Input Power" unit="kW" />
+            {report.outputPowerKW && <ParameterRow node={report.outputPowerKW} label="Output Power" unit="kW" />}
             <ParameterRow node={report.motorHP} label="Motor HP" unit="HP" />
             <ParameterRow node={report.motorPoles} label="Motor Poles" unit="Poles" />
             <ParameterRow node={report.inputRPM} label="Input Speed" unit="RPM" />
@@ -216,7 +232,7 @@ export const ParameterOriginMatrix: React.FC<ParameterOriginMatrixProps> = ({ re
                 'powerKW', 'motorHP', 'motorPoles', 'inputRPM', 'outputRPM',
                 'totalRatio', 'stages', 'serviceFactor', 'outputTorqueNm',
                 'rmsTorqueNm', 'accelerationTorqueNm', 'effectiveThermalPowerKW',
-                'requiredLifeHours'
+                'requiredLifeHours', 'shaftSpeedRPM', 'shaftTorqueNm'
               ];
               if (coreKeys.includes(key)) return null;
               

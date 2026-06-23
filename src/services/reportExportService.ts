@@ -179,18 +179,42 @@ export function exportToPDF(
   // ═══════════════════════════════════════════════════════════════════════════
   sectionHeader('3. Parameter Audit Trail & Classifications');
 
-  const paramRows = [
-    { node: report.powerKW,       label: 'Power (kW)',      display: `${report.powerKW.value} kW` },
+  const paramRows: any[] = [
+    { node: report.powerKW,       label: 'Input Power',     display: `${report.powerKW.value} kW` },
+  ];
+  if (report.outputPowerKW && report.outputPowerKW.value !== null && report.outputPowerKW.value !== undefined) {
+    paramRows.push({ node: report.outputPowerKW, label: 'Output Power', display: `${report.outputPowerKW.value.toFixed(2)} kW` });
+  }
+  paramRows.push(
     { node: report.motorHP,       label: 'Motor HP',        display: report.motorHP.value ? `${report.motorHP.value} HP` : 'N/A' },
     { node: report.motorPoles,    label: 'Motor Poles',     display: report.motorPoles.value ? `${report.motorPoles.value} Poles` : 'N/A' },
     { node: report.inputRPM,      label: 'Input Speed',     display: `${report.inputRPM.value} RPM` },
     { node: report.outputRPM,     label: 'Output Speed',    display: `${report.outputRPM.value?.toFixed(1)} RPM` },
     { node: report.totalRatio,    label: 'Total Ratio',     display: `${report.totalRatio.value?.toFixed(2)}:1` },
     { node: report.stages,        label: 'Stages',          display: `${report.stages.value} Reduction(s)` },
-    { node: report.serviceFactor, label: 'Service Factor',  display: report.serviceFactor.value?.toFixed(2) },
-  ];
+    { node: report.serviceFactor, label: 'Service Factor',  display: report.serviceFactor.value?.toFixed(2) }
+  );
 
-  if (report.outputTorqueNm?.value) paramRows.push({ node: report.outputTorqueNm, label: 'Output Torque', display: `${PowerTorqueEngine.formatTorqueExact(report.outputTorqueNm.value)} N·m` });
+  if (report.inputTorqueNm && report.inputTorqueNm.value !== null && report.inputTorqueNm.value !== undefined) {
+    let display = `${PowerTorqueEngine.formatTorqueExact(report.inputTorqueNm.value)} N·m`;
+    if (report.inputTorqueNm.mismatch) {
+      const ext = PowerTorqueEngine.formatTorqueExact(report.inputTorqueNm.mismatch.extractedValue);
+      const calc = PowerTorqueEngine.formatTorqueExact(report.inputTorqueNm.mismatch.calculatedValue);
+      const dev = report.inputTorqueNm.mismatch.deviationPercentage.toFixed(1);
+      display = `${ext} N·m (Specified) / ${calc} N·m (Calc) [${dev}% Mismatch]`;
+    }
+    paramRows.push({ node: report.inputTorqueNm, label: 'Input Torque', display });
+  }
+  if (report.outputTorqueNm && report.outputTorqueNm.value !== null && report.outputTorqueNm.value !== undefined) {
+    let display = `${PowerTorqueEngine.formatTorqueExact(report.outputTorqueNm.value)} N·m`;
+    if (report.outputTorqueNm.mismatch) {
+      const ext = PowerTorqueEngine.formatTorqueExact(report.outputTorqueNm.mismatch.extractedValue);
+      const calc = PowerTorqueEngine.formatTorqueExact(report.outputTorqueNm.mismatch.calculatedValue);
+      const dev = report.outputTorqueNm.mismatch.deviationPercentage.toFixed(1);
+      display = `${ext} N·m (Specified) / ${calc} N·m (Calc) [${dev}% Mismatch]`;
+    }
+    paramRows.push({ node: report.outputTorqueNm, label: 'Output Torque', display });
+  }
   if (report.rmsTorqueNm?.value) paramRows.push({ node: report.rmsTorqueNm, label: 'RMS Torque', display: `${PowerTorqueEngine.formatTorqueExact(report.rmsTorqueNm.value)} N·m` });
   if (report.accelerationTorqueNm?.value) paramRows.push({ node: report.accelerationTorqueNm, label: 'Accel Torque', display: `${PowerTorqueEngine.formatTorqueExact(report.accelerationTorqueNm.value)} N·m` });
   if (report.effectiveThermalPowerKW?.value) paramRows.push({ node: report.effectiveThermalPowerKW, label: 'Eff Thermal Power', display: `${report.effectiveThermalPowerKW.value.toFixed(2)} kW` });
@@ -207,10 +231,10 @@ export function exportToPDF(
     headStyles: { fillColor: SLATE_900, textColor: WHITE, fontSize: 7, fontStyle: 'bold' },
     columnStyles: {
       0: { cellWidth: 28, fontStyle: 'bold' },
-      1: { cellWidth: 25, halign: 'center' },
+      1: { cellWidth: 35, halign: 'center' },
       2: { cellWidth: 22, halign: 'center', fontStyle: 'bold' },
       3: { cellWidth: 35 },
-      4: { cellWidth: contentW - 110 }
+      4: { cellWidth: contentW - 120 }
     },
     didDrawCell: (data: { column: { index: number }, cell: { text: string[], x: number, y: number, height: number, width: number }, section: string }) => {
       if (data.section === 'body' && data.column.index === 2) {
@@ -415,6 +439,27 @@ export function exportToPDF(
   });
   y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5;
 
+  if (verificationReport.warnings.length > 0) {
+    if (y > 220) { doc.addPage(); y = margin; }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(217, 119, 6);
+    doc.text('Warnings & Engineering Deviations', margin, y + 4);
+    y += 6;
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      head: [['Deviation / Warning Description']],
+      body: verificationReport.warnings.map(w => [w]),
+      styles: { fontSize: 7, cellPadding: 2 },
+      headStyles: { fillColor: [217, 119, 6], textColor: WHITE, fontSize: 7, fontStyle: 'bold' },
+      theme: 'striped',
+      alternateRowStyles: { fillColor: [255, 251, 235] }
+    });
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5;
+  }
+
   // Recommendation box
   const allSafe = report.stageTraces.every(t => t.safetyFactor >= 1.0);
   doc.setFillColor(...(allSafe ? [236, 253, 245] as [number, number, number] : [254, 242, 242] as [number, number, number]));
@@ -485,17 +530,41 @@ export function exportToExcel(
   // ── Sheet 2: Parameter Audit Trail ────────────────────────────────────────
   const paramRows = [
     ['Parameter', 'Value', 'Classification', 'Source', 'Justification'],
-    ['Power (kW)', `${report.powerKW.value} kW`, report.powerKW.type, report.powerKW.source, report.powerKW.reasoning],
+    ['Input Power', `${report.powerKW.value} kW`, report.powerKW.type, report.powerKW.source, report.powerKW.reasoning],
+  ];
+  if (report.outputPowerKW && report.outputPowerKW.value !== null && report.outputPowerKW.value !== undefined) {
+    paramRows.push(['Output Power', `${report.outputPowerKW.value.toFixed(2)} kW`, report.outputPowerKW.type, report.outputPowerKW.source, report.outputPowerKW.reasoning]);
+  }
+  paramRows.push(
     ['Motor HP', report.motorHP.value ? `${report.motorHP.value} HP` : 'N/A', report.motorHP.type, report.motorHP.source, report.motorHP.reasoning],
     ['Motor Poles', report.motorPoles.value ? `${report.motorPoles.value} Poles` : 'N/A', report.motorPoles.type, report.motorPoles.source, report.motorPoles.reasoning],
     ['Input Speed', `${report.inputRPM.value} RPM`, report.inputRPM.type, report.inputRPM.source, report.inputRPM.reasoning],
     ['Output Speed', `${report.outputRPM.value?.toFixed(1)} RPM`, report.outputRPM.type, report.outputRPM.source, report.outputRPM.reasoning],
     ['Total Ratio', `${report.totalRatio.value?.toFixed(2)}:1`, report.totalRatio.type, report.totalRatio.source, report.totalRatio.reasoning],
     ['Stages', `${report.stages.value}`, report.stages.type, report.stages.source, report.stages.reasoning],
-    ['Service Factor', `${report.serviceFactor.value?.toFixed(2)}`, report.serviceFactor.type, report.serviceFactor.source, report.serviceFactor.reasoning],
-  ];
+    ['Service Factor', `${report.serviceFactor.value?.toFixed(2)}`, report.serviceFactor.type, report.serviceFactor.source, report.serviceFactor.reasoning]
+  );
 
-  if (report.outputTorqueNm?.value) paramRows.push(['Output Torque', `${PowerTorqueEngine.formatTorqueExact(report.outputTorqueNm.value)} N·m`, report.outputTorqueNm.type, report.outputTorqueNm.source, report.outputTorqueNm.reasoning]);
+  if (report.inputTorqueNm && report.inputTorqueNm.value !== null && report.inputTorqueNm.value !== undefined) {
+    let display = `${PowerTorqueEngine.formatTorqueExact(report.inputTorqueNm.value)} N·m`;
+    if (report.inputTorqueNm.mismatch) {
+      const ext = PowerTorqueEngine.formatTorqueExact(report.inputTorqueNm.mismatch.extractedValue);
+      const calc = PowerTorqueEngine.formatTorqueExact(report.inputTorqueNm.mismatch.calculatedValue);
+      const dev = report.inputTorqueNm.mismatch.deviationPercentage.toFixed(1);
+      display = `${ext} N·m (Specified) / ${calc} N·m (Calc) [${dev}% Mismatch]`;
+    }
+    paramRows.push(['Input Torque', display, report.inputTorqueNm.type, report.inputTorqueNm.source, report.inputTorqueNm.reasoning]);
+  }
+  if (report.outputTorqueNm && report.outputTorqueNm.value !== null && report.outputTorqueNm.value !== undefined) {
+    let display = `${PowerTorqueEngine.formatTorqueExact(report.outputTorqueNm.value)} N·m`;
+    if (report.outputTorqueNm.mismatch) {
+      const ext = PowerTorqueEngine.formatTorqueExact(report.outputTorqueNm.mismatch.extractedValue);
+      const calc = PowerTorqueEngine.formatTorqueExact(report.outputTorqueNm.mismatch.calculatedValue);
+      const dev = report.outputTorqueNm.mismatch.deviationPercentage.toFixed(1);
+      display = `${ext} N·m (Specified) / ${calc} N·m (Calc) [${dev}% Mismatch]`;
+    }
+    paramRows.push(['Output Torque', display, report.outputTorqueNm.type, report.outputTorqueNm.source, report.outputTorqueNm.reasoning]);
+  }
   if (report.rmsTorqueNm?.value) paramRows.push(['RMS Torque', `${PowerTorqueEngine.formatTorqueExact(report.rmsTorqueNm.value)} N·m`, report.rmsTorqueNm.type, report.rmsTorqueNm.source, report.rmsTorqueNm.reasoning]);
   if (report.accelerationTorqueNm?.value) paramRows.push(['Accel Torque', `${PowerTorqueEngine.formatTorqueExact(report.accelerationTorqueNm.value)} N·m`, report.accelerationTorqueNm.type, report.accelerationTorqueNm.source, report.accelerationTorqueNm.reasoning]);
   if (report.effectiveThermalPowerKW?.value) paramRows.push(['Eff Thermal Power', `${report.effectiveThermalPowerKW.value.toFixed(2)} kW`, report.effectiveThermalPowerKW.type, report.effectiveThermalPowerKW.source, report.effectiveThermalPowerKW.reasoning]);
@@ -537,6 +606,15 @@ export function exportToExcel(
     XLSX.utils.sheet_add_aoa(wsVerif, [['CRITICAL FAILURES']], { origin: { r: startRow, c: 0 } });
     verificationReport.criticalFailures.forEach((f, i) => {
       XLSX.utils.sheet_add_aoa(wsVerif, [[f]], { origin: { r: startRow + 1 + i, c: 0 } });
+    });
+  }
+
+  // Append warnings below
+  if (verificationReport.warnings.length > 0) {
+    const startRow = verifBody.length + (verificationReport.criticalFailures.length > 0 ? verificationReport.criticalFailures.length + 5 : 3);
+    XLSX.utils.sheet_add_aoa(wsVerif, [['WARNINGS']], { origin: { r: startRow, c: 0 } });
+    verificationReport.warnings.forEach((w, i) => {
+      XLSX.utils.sheet_add_aoa(wsVerif, [[w]], { origin: { r: startRow + 1 + i, c: 0 } });
     });
   }
   XLSX.utils.book_append_sheet(wb, wsVerif, 'Verification Audit');

@@ -302,7 +302,7 @@ export function verifyEngineeringReport(report: EngineeringReport, rawExtracted?
     const capacityNode = report.extractedEngineeringParams?.['capacity_tph'];
     const liftHeightNode = report.extractedEngineeringParams?.['liftHeight_m'];
     if (capacityNode?.value && liftHeightNode?.value && report.powerKW.value) {
-      const requiredPower = (capacityNode.value * liftHeightNode.value * 9.80665) / 3600;
+      const requiredPower = (capacityNode.value * liftHeightNode.value * 9.81) / 3600;
       infos.push(`Bucket Elevator Required Power calculated: ${requiredPower.toFixed(2)} kW (Capacity: ${capacityNode.value} TPH, Lift Height: ${liftHeightNode.value} m)`);
       if (report.powerKW.value < requiredPower) {
         warnings.push(`Power Validation Warning: Selected motor power (${report.powerKW.value} kW) is less than the calculated required process power (${requiredPower.toFixed(2)} kW).`);
@@ -519,6 +519,18 @@ export function verifyEngineeringReport(report: EngineeringReport, rawExtracted?
       : `❌ active scanner flagged ${dbCheck.critical.length} critical database anomalies.`
   };
 
+  if (report.validation.mismatches) {
+    for (const m of report.validation.mismatches) {
+      if (m.severity === 'Constraint') {
+        warnings.push(`Engineering Consistency Warning: ${m.message}`);
+      } else {
+        const sev = getDeviationSeverity(m.deviationPercentage || 0);
+        const sevText = sev ? sev.severityText : 'Minor Engineering Deviation';
+        warnings.push(`Engineering Consistency Warning: ${m.propertyName} deviates by ${m.deviationPercentage?.toFixed(1)}% (Specified: ${m.specifiedValue}, Calculated: ${m.calculatedValue}) — ${sevText}.`);
+      }
+    }
+  }
+
   return {
     overallScore,
     passed: overallScore === 100 && criticalFailures.length === 0,
@@ -535,5 +547,32 @@ export function verifyEngineeringReport(report: EngineeringReport, rawExtracted?
     missingInputs,
     criticalFailures,
     calculationsAudited
+  };
+}
+
+export function getDeviationSeverity(devPct: number): {
+  severity: 'Minor' | 'Moderate' | 'Critical';
+  severityText: string;
+  severityEmoji: string;
+} | null {
+  if (devPct < 5) return null;
+  if (devPct <= 15) {
+    return {
+      severity: 'Minor',
+      severityText: 'Minor Engineering Deviation',
+      severityEmoji: '🟡'
+    };
+  }
+  if (devPct <= 30) {
+    return {
+      severity: 'Moderate',
+      severityText: 'Moderate Engineering Deviation',
+      severityEmoji: '🟠'
+    };
+  }
+  return {
+    severity: 'Critical',
+    severityText: 'Critical Engineering Deviation',
+    severityEmoji: '🔴'
   };
 }

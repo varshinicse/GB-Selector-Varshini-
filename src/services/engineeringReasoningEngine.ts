@@ -42,7 +42,7 @@ function extractRange(text: string, type: 'input' | 'output' | 'ratio' | 'power'
     ];
   } else if (type === 'power') {
     patterns = [
-      /(?:motor\s+power|installed\s+power|\bpower\b)\s*[:=\s]\s*(\d+(?:\.\d+)?)\s*[-–—\s]+\s*(\d+(?:\.\d+)?)\s*(?:kW|HP|kW\s+motor|HP\s+motor)?/i
+      /(?:motor\s+power|installed\s+power|\bpower\b)\s*[:=\s]\s*(\d+(?:\.\d+)?)\s*[-–—\s]+\s*(\d+(?:\.\d+)?)\s*(?:kW|HP|kW\s+motor|HP\s+motor|W|watts|W\s+motor)?/i
     ];
   }
 
@@ -75,6 +75,13 @@ export interface AuditParameterNode<T> {
   reasoning: string;
   ruleApplied?: string;
   detectedText?: string;
+  powerSide?: 'INPUT' | 'OUTPUT';
+  mismatch?: {
+    isMismatch: boolean;
+    extractedValue: number;
+    calculatedValue: number;
+    deviationPercentage: number;
+  };
 }
 
 export interface ValidationItem {
@@ -105,6 +112,16 @@ export interface StageTrace {
   selectionRuleApplied: string;
 }
 
+export interface EngineeringMismatch {
+  category: string;
+  propertyName: string;
+  specifiedValue: string;
+  calculatedValue: string;
+  deviationPercentage?: number;
+  severity: 'Minor' | 'Moderate' | 'Critical' | 'Constraint';
+  message: string;
+}
+
 export interface EngineeringReport {
   projectName: string;
   applicationType: string;
@@ -118,10 +135,13 @@ export interface EngineeringReport {
   validation: {
     isValid: boolean;
     items: ValidationItem[];
+    mismatches?: EngineeringMismatch[];
   };
 
   // Parameters Audit Trail
   powerKW: AuditParameterNode<number>;
+  outputPowerKW?: AuditParameterNode<number | null>;
+  powerSide?: 'INPUT' | 'OUTPUT';
   motorHP: AuditParameterNode<number | null>;
   motorPoles: AuditParameterNode<number | null>;
   inputRPM: AuditParameterNode<number>;
@@ -293,11 +313,11 @@ export function validateInputs(
 
   // Validate Power
   if (powerKW === undefined || powerKW === null) {
-    items.push({ name: 'Power (kW)', status: '⚠ Missing', message: 'Power rating could not be extracted.' });
+    items.push({ name: 'Input Power (kW)', status: '⚠ Missing', message: 'Power rating could not be extracted.' });
   } else if (powerKW <= 0) {
-    items.push({ name: 'Power (kW)', status: '❌ Invalid', message: 'Power must be greater than 0.' });
+    items.push({ name: 'Input Power (kW)', status: '❌ Invalid', message: 'Power must be greater than 0.' });
   } else {
-    items.push({ name: 'Power (kW)', status: '✓ Valid', message: `Validated at ${powerKW} kW.` });
+    items.push({ name: 'Input Power (kW)', status: '✓ Valid', message: `Validated at ${powerKW} kW.` });
   }
 
   // Validate RPM
@@ -357,15 +377,15 @@ export function preprocessTextRanges(text: string): string {
     return `${val.toFixed(6)} RPM`;
   });
 
-  // Resolve Power ranges (HP or kW) unless we can derive it from torque/load and speed
+  // Resolve Power ranges (HP or kW or Watts) unless we can derive it from torque/load and speed
   const hasTorqueOrForce = /torque|pull|tension|load/i.test(text);
   const hasSpeedOrRPM = /speed|rpm|velocity/i.test(text);
   if (!(hasTorqueOrForce && hasSpeedOrRPM)) {
-    text = text.replace(/(\d+(?:\.\d+)?)\s*(?:-|to|–|—)\s*(\d+(?:\.\d+)?)\s*(?:HP|hp|horsepower|horse-power|kW|kilowatt|kilowatts)/gi, (match, minStr, maxStr) => {
+    text = text.replace(/(\d+(?:\.\d+)?)\s*(?:-|to|–|—)\s*(\d+(?:\.\d+)?)\s*(?:HP|hp|horsepower|horse-power|kW|kilowatt|kilowatts|W|watt|watts)/gi, (match, minStr, maxStr) => {
       const min = parseFloat(minStr);
       const max = parseFloat(maxStr);
       const resolved = min + (max - min) / 3;
-      const unit = match.match(/(?:HP|hp|horsepower|horse-power|kW|kilowatt|kilowatts)/i)?.[0] || '';
+      const unit = match.match(/(?:HP|hp|horsepower|horse-power|kW|kilowatt|kilowatts|W|watt|watts)/i)?.[0] || '';
       return `${resolved.toFixed(4)} ${unit}`;
     });
   }
@@ -1407,6 +1427,21 @@ ${notes}`);
     stagesReasoning = `Calculated required stage count of ${resolvedStages} stages based on target gear ratio (${R_req.toFixed(2)}:1) limits.`;
   }
 
+  let powerSide: 'INPUT' | 'OUTPUT' = 'INPUT';
+  if (derivedPowerTrace && derivedPowerTrace.ruleId) {
+    if (['DR-024', 'DR-025', 'DR-026', 'DR-POWER-002', 'DR-POWER-003', 'DR-POWER-011', 'DR-POWER-004', 'DR-POWER-008'].includes(derivedPowerTrace.ruleId)) {
+      powerSide = 'OUTPUT';
+      if (resolvedPower !== null && resolvedPower !== undefined) {
+        const stagesCount = resolvedStages || 3;
+        const efficiencyFactor = Math.pow(0.97, stagesCount);
+        const originalOutputPower = resolvedPower;
+        resolvedPower = originalOutputPower / efficiencyFactor;
+        gearboxInput.powerW = resolvedPower * 1000;
+        powerSteps = `P_out = ${originalOutputPower.toFixed(4)} kW → P_in = ${originalOutputPower.toFixed(4)} / (0.97^${stagesCount}) = ${resolvedPower.toFixed(4)} kW`;
+        powerReasoning = `Derived output mechanical power (${originalOutputPower.toFixed(4)} kW) was scaled up to input motor power using gearbox stage efficiency (0.97^${stagesCount} = ${(efficiencyFactor * 100).toFixed(1)}%). ` + powerReasoning;
+      }
+    }
+  }
 
   const stageEvaluationTrace = {
     targetRatio: R_req,
@@ -1435,15 +1470,26 @@ ${notes}`);
   };
 
   const powerMeta = getTraceConfAndType('powerKW', powerType, resolvedPower);
-  const powerNode: AuditParameterNode<number> = {
-    name: 'Power (kW)',
+  const powerNode: AuditParameterNode<number> = powerSide === 'OUTPUT' ? {
+    name: 'Input Power (kW)',
+    value: resolvedPower!,
+    type: 'CALCULATED',
+    source: 'Efficiency Propagation',
+    formula: 'Pin = Pout / (0.97^Stages)',
+    calculationSteps: powerSteps || `${resolvedPower} kW`,
+    confidence: powerMeta.confidence,
+    reasoning: powerReasoning || 'Power rating could not be resolved.',
+    powerSide
+  } : {
+    name: 'Input Power (kW)',
     value: resolvedPower!,
     type: powerMeta.type,
     source: powerSource,
     formula: powerFormula,
     calculationSteps: powerSteps || `${resolvedPower} kW`,
     confidence: powerMeta.confidence,
-    reasoning: powerReasoning || 'Power rating could not be resolved.'
+    reasoning: powerReasoning || 'Power rating could not be resolved.',
+    powerSide
   };
 
   const motorHPNode: AuditParameterNode<number | null> = {
@@ -1526,8 +1572,35 @@ ${notes}`);
     reasoning: sfReasoning || 'Service factor could not be resolved.'
   };
 
+  const stagesCount = stagesNode.value || 3;
+  const currentEff = (parserResult.values.efficiency !== undefined && parserResult.values.efficiency !== null)
+    ? parserResult.values.efficiency
+    : Math.pow(0.97, stagesCount);
+  const outputPowerVal = resolvedPower ? resolvedPower * currentEff : null;
+  const outputPowerNode: AuditParameterNode<number | null> = powerSide === 'OUTPUT' ? {
+    name: 'Output Power (kW)',
+    value: outputPowerVal,
+    type: powerMeta.type,
+    source: powerSource,
+    formula: powerFormula,
+    calculationSteps: (derivedPowerTrace && derivedPowerTrace.outputProduced) || 'N/A',
+    confidence: powerMeta.confidence,
+    reasoning: derivedPowerTrace
+      ? (derivationRules.find(r => r.id === derivedPowerTrace.ruleId)?.auditDescription || 'Derived output mechanical power from load conditions.')
+      : 'Derived output mechanical power from load conditions.'
+  } : {
+    name: 'Output Power (kW)',
+    value: outputPowerVal,
+    type: 'CALCULATED',
+    source: 'Efficiency Propagation',
+    formula: 'Pout = Pin * Efficiency',
+    calculationSteps: resolvedPower ? `Pout = ${resolvedPower.toFixed(2)} * ${currentEff.toFixed(4)} = ${outputPowerVal?.toFixed(2)} kW` : 'N/A',
+    confidence: powerMeta.confidence,
+    reasoning: 'Calculated continuous output power by propagating input power through planetary reduction stages at 97% efficiency per stage.'
+  };
+
   // 9. VALIDATION
-  const validation = validateInputs(
+  const validation: { isValid: boolean; items: ValidationItem[]; mismatches?: EngineeringMismatch[] } = validateInputs(
     powerNode.value,
     inputRPMNode.value,
     ratioNode.value,
@@ -1546,13 +1619,10 @@ ${notes}`);
     powerNode.value !== null &&
     powerNode.value !== undefined &&
     !isNaN(powerNode.value) &&
-    inputRPMNode.value !== null &&
-    inputRPMNode.value !== undefined &&
-    !isNaN(inputRPMNode.value) &&
-    inputRPMNode.value > 0
+    powerNode.value > 0
   ) {
     const P = powerNode.value;
-    const Nin = inputRPMNode.value;
+    const Nin = (inputRPMNode.value !== null && inputRPMNode.value !== undefined && inputRPMNode.value > 0) ? inputRPMNode.value : 1440;
     const Tin = PowerTorqueEngine.calcTorque(P * 1000, Nin * 2 * Math.PI / 60);
     inputTorqueTrace = {
       formula: 'Tin = (Power × 60000) / (2 × π × InputRPM)',
@@ -1561,6 +1631,12 @@ ${notes}`);
     };
   }
 
+  const isSizingResolvable =
+    powerNode.value !== null && powerNode.value !== undefined && !isNaN(powerNode.value) && powerNode.value > 0 &&
+    ratioNode.value !== null && ratioNode.value !== undefined && !isNaN(ratioNode.value) && ratioNode.value > 0 &&
+    stagesNode.value !== null && stagesNode.value !== undefined && !isNaN(stagesNode.value) && stagesNode.value >= 1 &&
+    serviceFactorNode.value !== null && serviceFactorNode.value !== undefined && !isNaN(serviceFactorNode.value) && serviceFactorNode.value > 0;
+
   const hasAllCriticalInputs =
     powerNode.value !== null && powerNode.value !== undefined && !isNaN(powerNode.value) &&
     inputRPMNode.value !== null && inputRPMNode.value !== undefined && !isNaN(inputRPMNode.value) &&
@@ -1568,8 +1644,8 @@ ${notes}`);
     stagesNode.value !== null && stagesNode.value !== undefined && !isNaN(stagesNode.value) &&
     serviceFactorNode.value !== null && serviceFactorNode.value !== undefined && !isNaN(serviceFactorNode.value);
 
-  if (validation.isValid && hasAllCriticalInputs) {
-    const Nin = inputRPMNode.value;
+  if (isSizingResolvable) {
+    const Nin = (inputRPMNode.value !== null && inputRPMNode.value !== undefined && inputRPMNode.value > 0) ? inputRPMNode.value : 1440;
     const Tin = inputTorqueTrace.result;
 
     // Distribute ratios
@@ -1649,28 +1725,32 @@ ${notes}`);
   }
 
   if ((overallOutputTorque === null || overallOutputTorque === undefined || overallOutputTorque === 0) && powerNode.value !== null && powerNode.value !== undefined && outputRPMNode.value !== null && outputRPMNode.value !== undefined && outputRPMNode.value > 0) {
-    overallOutputTorque = (powerNode.value * (60000 / (2 * Math.PI))) / outputRPMNode.value;
+    overallOutputTorque = ((powerNode.value * (60000 / (2 * Math.PI))) / outputRPMNode.value) * (overallEfficiency || 1);
     overallMaxTorque = overallOutputTorque * serviceFactorNode.value;
   }
 
-  // 11. FINAL RECOMMENDATION TEXT
-  const lastGb = stageTraces[stageTraces.length - 1]?.selectedGearbox;
-  const isSafe = stageTraces.length > 0 && stageTraces.every(d => d.safetyFactor >= 1.0);
-
-  let recommendationText = `Based on the provided specification sheet, MAGTORQ's Engineering Reasoning Engine has completed a full structural analysis of the drive requirements. \n\n`;
-
-  if (hasAllCriticalInputs) {
-    recommendationText += `We recommend a **${stagesNode.value}-stage reduction gearbox configuration** utilizing the **${stagesNode.value === 1 ? 'S1' : stagesNode.value === 2 ? 'S1 × S2' : stagesNode.value === 3 ? 'S1 × S2 × S3' : 'S1 × S2 × S3 × S4'}** series sequence. `;
-
-    if (lastGb) {
-      recommendationText += `The final stage is resolved to a **MAGTORQ ${lastGb.size}** model, which satisfies the output nominal torque demands of **${PowerTorqueEngine.formatTorqueExact(overallOutputTorque)} N·m** and peak loads of **${PowerTorqueEngine.formatTorqueExact(overallMaxTorque)} N·m** under a service factor of **${serviceFactorNode.value}**. \n\n`;
+  if (inputTorqueTrace.result === 0) {
+    const resolvedTin = resolved.inputTorqueNm || parserResult.values.inputTorqueNm;
+    if (resolvedTin !== null && resolvedTin !== undefined && resolvedTin > 0) {
+      const trace = derivationResult.traces.find(t => t.outputProduced.startsWith('inputTorqueNm'));
+      inputTorqueTrace = {
+        formula: trace ? trace.formulaUsed : 'Resolved from rules',
+        calculationSteps: trace ? trace.outputProduced : `Tin = ${resolvedTin} N·m`,
+        result: resolvedTin
+      };
     }
+  }
 
-    recommendationText += `**Calculated Ratios Breakdown:** ${stageTraces.map(t => t.ratio).join(' × ')} yielding a total reduction ratio of **${R_req.toFixed(2)}:1** (Output Speed: **${outputRPMNode.value.toFixed(1)} RPM**).
-**Efficiency Analysis:** Overall mechanical efficiency is calculated at **${(overallEfficiency * 100).toFixed(1)}%** (assuming a standard transmission loss of 3% per planetary reduction stage).
-**Drivetrain Status:** ${isSafe ? '⚡ Safe & Compliant. All reduction stages operate within the nominal and peak rated capacity margins.' : '⚠ Warning: Overload detected on intermediate stages. We suggest selecting a higher frame size or adjusting service factor settings.'}`;
-  } else {
-    recommendationText += `**Drivetrain Status:** Additional design parameters must be entered to resolve the calculations.`;
+  if (overallOutputTorque === null || overallOutputTorque === undefined || overallOutputTorque === 0) {
+    const resolvedTout = resolved.outputTorqueNm || parserResult.values.outputTorqueNm;
+    if (resolvedTout !== null && resolvedTout !== undefined && resolvedTout > 0) {
+      overallOutputTorque = resolvedTout;
+      overallMaxTorque = overallOutputTorque * (serviceFactorNode.value || 1.0);
+      const effVal = (parserResult.values.efficiency !== undefined && parserResult.values.efficiency !== null)
+        ? parserResult.values.efficiency
+        : TorquePropagationEngine.overallEfficiency(stagesNode.value || 3);
+      overallEfficiency = effVal;
+    }
   }
 
   const createDerivationNodeOptional = <T>(
@@ -1695,7 +1775,7 @@ ${notes}`);
     return undefined;
   };
 
-  const inputTorqueNmNode = parserResult.nodes.inputTorqueNm || createDerivationNodeOptional<number>('inputTorqueNm', 'Input Torque', 'N·m') || (inputTorqueTrace.result > 0 ? {
+  const inputTorqueNmNode: AuditParameterNode<number | null> | undefined = (parserResult.nodes.inputTorqueNm as any) || createDerivationNodeOptional<number>('inputTorqueNm', 'Input Torque', 'N·m') || (inputTorqueTrace.result > 0 ? {
     name: 'Input Torque (N·m)',
     value: inputTorqueTrace.result,
     type: 'CALCULATED',
@@ -1706,7 +1786,7 @@ ${notes}`);
     reasoning: 'Derived motor shaft input torque from resolved input power and speed.'
   } as AuditParameterNode<number> : undefined);
 
-  const outputTorqueNmNode = parserResult.nodes.outputTorqueNm || createDerivationNodeOptional<number>('outputTorqueNm', 'Output Torque', 'N·m') || (overallOutputTorque > 0 ? {
+  const outputTorqueNmNode: AuditParameterNode<number | null> | undefined = (parserResult.nodes.outputTorqueNm as any) || createDerivationNodeOptional<number>('outputTorqueNm', 'Output Torque', 'N·m') || (overallOutputTorque > 0 ? {
     name: 'Output Torque (N·m)',
     value: overallOutputTorque,
     type: 'CALCULATED',
@@ -1716,6 +1796,212 @@ ${notes}`);
     confidence: 'High',
     reasoning: 'Calculated continuous output torque by propagating input torque through stage ratios and planetary efficiencies.'
   } as AuditParameterNode<number> : undefined);
+
+  // 10b. ENGINEERING CONSISTENCY VALIDATION
+  const mismatches: EngineeringMismatch[] = [];
+  validation.mismatches = mismatches;
+
+  const hasUserPower = parserResult.nodes.powerW?.type === 'EXTRACTED';
+  const hasUserInputRPM = parserResult.nodes.inputRadS?.type === 'EXTRACTED';
+  const hasUserOutputRPM = parserResult.nodes.outputRadS?.type === 'EXTRACTED';
+  const hasUserRatio = parserResult.nodes.totalRatio?.type === 'EXTRACTED';
+  const hasUserInputTorque = parserResult.nodes.inputTorqueNm?.type === 'EXTRACTED';
+  const hasUserOutputTorque = parserResult.nodes.outputTorqueNm?.type === 'EXTRACTED';
+  const hasUserHP = parserResult.nodes.motorHP?.type === 'EXTRACTED';
+
+  const userPower = hasUserPower ? parserResult.values.powerW / 1000 : null;
+  const userInputRPM = hasUserInputRPM ? parserResult.values.inputRadS * 60 / (2 * Math.PI) : null;
+  const userOutputRPM = hasUserOutputRPM ? parserResult.values.outputRadS * 60 / (2 * Math.PI) : null;
+  const userRatio = hasUserRatio ? parserResult.values.totalRatio : null;
+  const userInputTorque = hasUserInputTorque ? parserResult.values.inputTorqueNm : null;
+  const userOutputTorque = hasUserOutputTorque ? parserResult.values.outputTorqueNm : null;
+  const userHP = hasUserHP ? parserResult.values.motorHP : null;
+
+  const addMismatch = (
+    category: string,
+    propertyName: string,
+    userVal: number,
+    derivedVal: number,
+    unit: string,
+    formatFn: (v: number) => string
+  ) => {
+    const deviation = Math.abs(userVal - derivedVal) / (userVal || 1);
+    const devPct = deviation * 100;
+    if (devPct < 5) {
+      validation.items.push({
+        name: `${propertyName} Consistency`,
+        status: '✓ Valid',
+        message: `Extracted ${propertyName.toLowerCase()} (${formatFn(userVal)}${unit}) matches calculated value within ${devPct.toFixed(1)}%.`
+      });
+      return;
+    }
+    
+    let severity: 'Minor' | 'Moderate' | 'Critical' = 'Minor';
+    if (devPct > 30) severity = 'Critical';
+    else if (devPct > 15) severity = 'Moderate';
+
+    mismatches.push({
+      category,
+      propertyName,
+      specifiedValue: `${formatFn(userVal)}${unit}`,
+      calculatedValue: `${formatFn(derivedVal)}${unit}`,
+      deviationPercentage: devPct,
+      severity,
+      message: `${propertyName} Mismatch: Specified ${formatFn(userVal)}${unit}, Calculated ${formatFn(derivedVal)}${unit} (${devPct.toFixed(1)}% Mismatch)`
+    });
+    validation.isValid = false;
+    validation.items.push({
+      name: `${propertyName} Consistency`,
+      status: '❌ Invalid',
+      message: `Engineering Consistency Warning: Extracted ${propertyName.toLowerCase()} (${formatFn(userVal)}${unit}) deviates by ${devPct.toFixed(1)}% from calculated value (${formatFn(derivedVal)}${unit}).`
+    });
+  };
+
+  // 1. Torque Consistency (Power + Speed -> Calculated Torque)
+  if (hasUserPower && hasUserInputTorque && userPower && userInputTorque && inputRPMNode.value > 0) {
+    const calcTin = (userPower * 1000 * 60) / (2 * Math.PI * inputRPMNode.value);
+    addMismatch('Torque Consistency', 'Input Torque', userInputTorque, calcTin, ' Nm', (v) => PowerTorqueEngine.formatTorqueExact(v));
+  }
+  if (hasUserPower && hasUserOutputTorque && userPower && userOutputTorque && outputRPMNode.value > 0) {
+    const eff = overallEfficiency || TorquePropagationEngine.overallEfficiency(stagesNode.value || 3);
+    const derivedPout = powerSide === 'OUTPUT' ? userPower : userPower * eff;
+    const calcTout = (derivedPout * 1000 * 60) / (2 * Math.PI * outputRPMNode.value);
+    addMismatch('Torque Consistency', 'Output Torque', userOutputTorque, calcTout, ' Nm', (v) => PowerTorqueEngine.formatTorqueExact(v));
+  }
+
+  // 2. Speed Consistency (Input RPM + Ratio -> Calculated Output RPM)
+  if (hasUserInputRPM && hasUserRatio && hasUserOutputRPM && userInputRPM && userRatio && userOutputRPM) {
+    const calcToutSpeed = userInputRPM / userRatio;
+    addMismatch('Speed Consistency', 'Output RPM', userOutputRPM, calcToutSpeed, ' RPM', (v) => v.toFixed(1));
+  }
+
+  // 3. Ratio Consistency (Input RPM + Output RPM -> Calculated Ratio)
+  if (hasUserInputRPM && hasUserOutputRPM && hasUserRatio && userInputRPM && userOutputRPM && userRatio) {
+    const calcRatio = userInputRPM / userOutputRPM;
+    addMismatch('Ratio Consistency', 'Total Ratio', userRatio, calcRatio, ':1', (v) => v.toFixed(2));
+  }
+
+  // 4. Power Consistency (Torque + Speed -> Calculated Power)
+  if (hasUserPower && userPower) {
+    let derivedPowerInput: number | null = null;
+    const eff = overallEfficiency || TorquePropagationEngine.overallEfficiency(stagesNode.value || 3);
+
+    if (hasUserInputTorque && hasUserInputRPM && userInputTorque && userInputRPM) {
+      derivedPowerInput = (userInputTorque * userInputRPM * 2 * Math.PI) / (60 * 1000);
+    } else if (hasUserOutputTorque && hasUserOutputRPM && userOutputTorque && userOutputRPM) {
+      derivedPowerInput = (userOutputTorque * userOutputRPM * 2 * Math.PI) / (60 * 1000 * eff);
+    }
+
+    if (derivedPowerInput !== null) {
+      const derivedPowerCompared = powerSide === 'OUTPUT' ? derivedPowerInput * eff : derivedPowerInput;
+      addMismatch('Power Consistency', 'Power', userPower, derivedPowerCompared, ' kW', (v) => v.toFixed(2));
+    }
+  }
+
+  // 5. Input Torque Consistency (Output Torque + Ratio + Efficiency -> Calculated Input Torque)
+  if (hasUserInputTorque && hasUserOutputTorque && hasUserRatio && userInputTorque && userOutputTorque && userRatio) {
+    const eff = overallEfficiency || TorquePropagationEngine.overallEfficiency(stagesNode.value || 3);
+    const calcTinFromTout = userOutputTorque / (userRatio * eff);
+    addMismatch('Input Torque Consistency', 'Input Torque', userInputTorque, calcTinFromTout, ' Nm', (v) => PowerTorqueEngine.formatTorqueExact(v));
+  }
+
+  // 6. Output Torque Consistency (Input Torque + Ratio + Efficiency -> Calculated Output Torque)
+  if (hasUserInputTorque && hasUserOutputTorque && hasUserRatio && userInputTorque && userOutputTorque && userRatio) {
+    const eff = overallEfficiency || TorquePropagationEngine.overallEfficiency(stagesNode.value || 3);
+    const calcToutFromTin = userInputTorque * userRatio * eff;
+    addMismatch('Output Torque Consistency', 'Output Torque', userOutputTorque, calcToutFromTin, ' Nm', (v) => PowerTorqueEngine.formatTorqueExact(v));
+  }
+
+  // 7. Motor HP Consistency (Power kW -> Calculated HP)
+  if (hasUserHP && hasUserPower && userHP && userPower) {
+    const calcHP = userPower / 0.7457;
+    addMismatch('Motor HP Consistency', 'Motor HP', userHP, calcHP, ' HP', (v) => v.toFixed(2));
+  }
+
+  // 8. Constraint Consistency (User Output Speed Limit vs Calculated Output Speed)
+  const calculatedOutputRPM = outputRPMNode.value;
+  if (parserResult.values.outputSpeedMax !== undefined && parserResult.values.outputSpeedMax !== null && calculatedOutputRPM > parserResult.values.outputSpeedMax) {
+    mismatches.push({
+      category: 'Constraint Consistency',
+      propertyName: 'Output Speed Max Limit',
+      specifiedValue: `≤ ${parserResult.values.outputSpeedMax} RPM`,
+      calculatedValue: `${calculatedOutputRPM.toFixed(1)} RPM`,
+      severity: 'Constraint',
+      message: `Output Speed Constraint Violated: Calculated output speed of ${calculatedOutputRPM.toFixed(1)} RPM exceeds user-specified maximum limit of ${parserResult.values.outputSpeedMax} RPM.`
+    });
+    validation.isValid = false;
+    validation.items.push({
+      name: 'Output Speed Constraint',
+      status: '❌ Invalid',
+      message: `Output Speed Constraint Violated: Calculated output speed of ${calculatedOutputRPM.toFixed(1)} RPM exceeds user-specified maximum limit of ${parserResult.values.outputSpeedMax} RPM.`
+    });
+  }
+  if (parserResult.values.outputSpeedMin !== undefined && parserResult.values.outputSpeedMin !== null && calculatedOutputRPM < parserResult.values.outputSpeedMin) {
+    mismatches.push({
+      category: 'Constraint Consistency',
+      propertyName: 'Output Speed Min Limit',
+      specifiedValue: `≥ ${parserResult.values.outputSpeedMin} RPM`,
+      calculatedValue: `${calculatedOutputRPM.toFixed(1)} RPM`,
+      severity: 'Constraint',
+      message: `Output Speed Constraint Violated: Calculated output speed of ${calculatedOutputRPM.toFixed(1)} RPM is below user-specified minimum limit of ${parserResult.values.outputSpeedMin} RPM.`
+    });
+    validation.isValid = false;
+    validation.items.push({
+      name: 'Output Speed Constraint',
+      status: '❌ Invalid',
+      message: `Output Speed Constraint Violated: Calculated output speed of ${calculatedOutputRPM.toFixed(1)} RPM is below user-specified minimum limit of ${parserResult.values.outputSpeedMin} RPM.`
+    });
+  }
+
+  // Update mismatch properties of specific parameter nodes for backwards-compatibility
+  const inputTorqueMismatch = mismatches.find(m => m.propertyName === 'Input Torque');
+  if (inputTorqueMismatch && inputTorqueNmNode && inputTorqueMismatch.deviationPercentage) {
+    const calcVal = parseFloat(inputTorqueMismatch.calculatedValue.replace(/[^\d.]/g, ''));
+    const specVal = parseFloat(inputTorqueMismatch.specifiedValue.replace(/[^\d.]/g, ''));
+    inputTorqueNmNode.mismatch = {
+      isMismatch: true,
+      extractedValue: specVal,
+      calculatedValue: calcVal,
+      deviationPercentage: inputTorqueMismatch.deviationPercentage
+    };
+    inputTorqueNmNode.value = calcVal;
+    inputTorqueNmNode.reasoning = `⚠ Engineering Consistency Warning: Extracted input torque (${specVal.toFixed(1)} N·m) deviates by ${inputTorqueMismatch.deviationPercentage.toFixed(1)}% from calculated value. Overridden for consistency.`;
+  }
+
+  const outputTorqueMismatch = mismatches.find(m => m.propertyName === 'Output Torque');
+  if (outputTorqueMismatch && outputTorqueNmNode && outputTorqueMismatch.deviationPercentage) {
+    const calcVal = parseFloat(outputTorqueMismatch.calculatedValue.replace(/[^\d.]/g, ''));
+    const specVal = parseFloat(outputTorqueMismatch.specifiedValue.replace(/[^\d.]/g, ''));
+    outputTorqueNmNode.mismatch = {
+      isMismatch: true,
+      extractedValue: specVal,
+      calculatedValue: calcVal,
+      deviationPercentage: outputTorqueMismatch.deviationPercentage
+    };
+    outputTorqueNmNode.value = calcVal;
+    outputTorqueNmNode.reasoning = `⚠ Engineering Consistency Warning: Extracted output torque (${specVal.toFixed(1)} N·m) deviates by ${outputTorqueMismatch.deviationPercentage.toFixed(1)}% from calculated value. Overridden for consistency.`;
+  }
+
+  // 11. FINAL RECOMMENDATION TEXT
+  const lastGb = stageTraces[stageTraces.length - 1]?.selectedGearbox;
+  const isSafe = stageTraces.length > 0 && stageTraces.every(d => d.safetyFactor >= 1.0);
+  const hasConsistencyWarning = mismatches.length > 0;
+
+  let recommendationText = `Based on the provided specification sheet, MAGTORQ's Engineering Reasoning Engine has completed a full structural analysis of the drive requirements. \n\n`;
+
+  if (hasAllCriticalInputs) {
+    recommendationText += `We recommend a **${stagesNode.value}-stage reduction gearbox configuration** utilizing the **${stagesNode.value === 1 ? 'S1' : stagesNode.value === 2 ? 'S1 × S2' : stagesNode.value === 3 ? 'S1 × S2 × S3' : 'S1 × S2 × S3 × S4'}** series sequence. `;
+
+    if (lastGb) {
+      recommendationText += `The final stage is resolved to a **MAGTORQ ${lastGb.size}** model, which satisfies the output nominal torque demands of **${PowerTorqueEngine.formatTorqueExact(overallOutputTorque)} N·m** and peak loads of **${PowerTorqueEngine.formatTorqueExact(overallMaxTorque)} N·m** under a service factor of **${serviceFactorNode.value}**. \n\n`;
+    }
+
+    recommendationText += `**Calculated Ratios Breakdown:** ${stageTraces.map(t => t.ratio).join(' × ')} yielding a total reduction ratio of **${R_req.toFixed(2)}:1** (Output Speed: **${outputRPMNode.value.toFixed(1)} RPM**).
+**Efficiency Analysis:** Overall mechanical efficiency is calculated at **${(overallEfficiency * 100).toFixed(1)}%** (assuming a standard transmission loss of 3% per planetary reduction stage).
+**Drivetrain Status:** ${hasConsistencyWarning ? '⚠ Selection Generated With Validation Warnings. All reduction stages operate within the nominal and peak rated capacity margins.' : isSafe ? '⚡ Safe & Compliant. All reduction stages operate within the nominal and peak rated capacity margins.' : '⚠ Warning: Overload detected on intermediate stages. We suggest selecting a higher frame size or adjusting service factor settings.'}`;
+  } else {
+    recommendationText += `**Drivetrain Status:** Additional design parameters must be entered to resolve the calculations.`;
+  }
 
   const shaftSpeedRPMNode = parserResult.nodes.shaftSpeedRPM || createDerivationNodeOptional<number>('shaftSpeedRPM', 'Shaft Speed', 'RPM');
   const shaftTorqueNmNode = parserResult.nodes.shaftTorqueNm || createDerivationNodeOptional<number>('shaftTorqueNm', 'Shaft Torque', 'N·m');
@@ -1735,6 +2021,8 @@ ${notes}`);
     gearboxPreferences,
     validation,
     powerKW: powerNode,
+    outputPowerKW: outputPowerNode,
+    powerSide,
     motorHP: motorHPNode,
     motorPoles: motorPolesNode,
     inputRPM: inputRPMNode,

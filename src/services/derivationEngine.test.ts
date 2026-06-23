@@ -47,8 +47,8 @@ describe('Phase 1 Derivation Rules Formula Accuracy', () => {
       pumpEfficiency: 0.70,
       liquidDensity_kg_m3: 1000
     });
-    // P = (1000 * 9.80665 * 0.05 * 45) / 0.7 = 22064.96 / 0.7 = 31521.375 W
-    expect(res).toBeCloseTo(31521.375, 3);
+    // P = (1000 * 9.81 * 0.05 * 45) / 0.7 = 22072.5 / 0.7 = 31532.143 W
+    expect(res).toBeCloseTo(31532.143, 3);
   });
 
   it('should verify DR-010: Acceleration Torque', () => {
@@ -157,8 +157,8 @@ describe('Raw Text Engineering Value Extraction', () => {
     const result = parseInputsWithMetadata(text);
     const parsed = result.values;
     
-    // Ton to N conversion: 5 * 9806.65 = 49033.25
-    expect(parsed.hoistLoad_N).toBeCloseTo(49033.25, 2);
+    // Ton to N conversion: 5 * 9810 = 49050
+    expect(parsed.hoistLoad_N).toBeCloseTo(49050.00, 2);
     // m/min to m/s conversion: 12 / 60 = 0.2
     expect(parsed.hoistSpeed_m_s).toBeCloseTo(0.2, 2);
     // mm to m conversion: 400 / 1000 = 0.4
@@ -218,7 +218,8 @@ describe('Dependency-Based Engineering Reasoning Engine', () => {
     it('should calculate Power = Torque * RadS when efficiency is missing', () => {
       const known = { outputTorqueNm: 9550, outputRadS: 10 * 2 * Math.PI / 60 };
       const res = MissingParameterResolutionEngine.resolve(known);
-      expect(res.derivedParameters.powerW).toBeCloseTo(9550 * 10 * 2 * Math.PI / 60, 2);
+      // With 1 stage (default ratio <= 10.26), efficiency = 0.97
+      expect(res.derivedParameters.powerW).toBeCloseTo((9550 * 10 * 2 * Math.PI / 60) / 0.97, 2);
     });
 
     it('should calculate Power = Force * Velocity', () => {
@@ -227,10 +228,10 @@ describe('Dependency-Based Engineering Reasoning Engine', () => {
       expect(res.derivedParameters.powerW).toBe(3000);
     });
 
-    it('should calculate Power = Load_kg * 9.80665 * Speed_m_s', () => {
+    it('should calculate Power = Load_kg * 9.81 * Speed_m_s', () => {
       const known = { load_kg: 100, linearSpeed_m_s: 2 };
       const res = MissingParameterResolutionEngine.resolve(known);
-      expect(res.derivedParameters.powerW).toBeCloseTo(1961.33, 2);
+      expect(res.derivedParameters.powerW).toBeCloseTo(1962.00, 2);
     });
 
     it('should calculate Torque = Power / RadS when efficiency is missing', () => {
@@ -363,8 +364,8 @@ describe('Dependency-Based Engineering Reasoning Engine', () => {
         powerW: 10000,
         outputTorqueNm: 955
       });
-      // RadS = 10000 / 955 = 10.47
-      expect(res.derivedParameters.outputRadS).toBeCloseTo(10.47, 2);
+      // RadS = (10000 * 0.97) / 955 = 10.157
+      expect(res.derivedParameters.outputRadS).toBeCloseTo(10.157, 2);
     });
 
     it('should derive Design Torque from output torque and service factor using DR-TORQUE-006', () => {
@@ -576,7 +577,8 @@ describe('Dependency-Based Engineering Reasoning Engine', () => {
           'Output Torque : 5000 Nm\nOutput Speed : 20 RPM',
           {}
         );
-        expect(report.powerKW.value).toBeCloseTo(10.47, 2);
+        // Correct Input Power = (Output Torque * Output Speed) / 0.97 = 10.796 kW
+        expect(report.powerKW.value).toBeCloseTo(10.80, 2);
         expect(report.powerKW.type).toBe('CALCULATED');
       });
 
@@ -594,7 +596,8 @@ describe('Dependency-Based Engineering Reasoning Engine', () => {
           'Belt Pull : 12000 N\nBelt Speed : 1.5 m/s',
           {}
         );
-        expect(report.powerKW.value).toBe(18);
+        expect(report.powerKW.value).toBeCloseTo(18.56, 2);
+        expect(report.outputPowerKW?.value).toBe(18);
         expect(report.powerKW.type).toBe('CALCULATED');
       });
 
@@ -603,7 +606,8 @@ describe('Dependency-Based Engineering Reasoning Engine', () => {
           'Chain Pull : 15000 N\nChain Speed : 0.8 m/s',
           {}
         );
-        expect(report.powerKW.value).toBe(12);
+        expect(report.powerKW.value).toBeCloseTo(12.37, 2);
+        expect(report.outputPowerKW?.value).toBe(12);
         expect(report.powerKW.type).toBe('CALCULATED');
       });
 
@@ -621,7 +625,8 @@ describe('Dependency-Based Engineering Reasoning Engine', () => {
           'Load : 5000 kg\nLifting Speed : 10 m/min',
           {}
         );
-        expect(report.powerKW.value).toBeCloseTo(8.17, 2);
+        expect(report.powerKW.value).toBeCloseTo(8.43, 2);
+        expect(report.outputPowerKW?.value).toBeCloseTo(8.18, 2);
         expect(report.powerKW.type).toBe('CALCULATED');
       });
 
@@ -639,7 +644,8 @@ describe('Dependency-Based Engineering Reasoning Engine', () => {
           'Output Torque : 87500 Nm\nOutput Speed : 12 RPM',
           {}
         );
-        expect(report.powerKW.value).toBeCloseTo(110.0, 0);
+        // Correct Input Power = (Output Torque * Output Speed) / 0.97 = 113.36 kW
+        expect(report.powerKW.value).toBeCloseTo(113.4, 1);
         expect(report.powerKW.type).toBe('CALCULATED');
       });
 
@@ -648,7 +654,7 @@ describe('Dependency-Based Engineering Reasoning Engine', () => {
           'Capacity : 120 TPH\nLift Height : 25 m\nEfficiency : 85%',
           {}
         );
-        expect(report.powerKW.value).toBeCloseTo(9.6, 1);
+        expect(report.powerKW.value).toBeCloseTo(9.9, 1);
         expect(report.powerKW.type).toBe('CALCULATED');
       });
 
@@ -665,7 +671,8 @@ describe('Dependency-Based Engineering Reasoning Engine', () => {
           'Torque : 5000 Nm\nRPM : 20\nPower : 5-20 kW',
           {}
         );
-        expect(report.powerKW.value).toBeCloseTo(10.47, 2);
+        // Correct Input Power = 10.796 kW
+        expect(report.powerKW.value).toBeCloseTo(10.80, 2);
         expect(report.powerKW.type).toBe('CALCULATED');
       });
 
@@ -675,7 +682,9 @@ describe('Dependency-Based Engineering Reasoning Engine', () => {
           {}
         );
         expect(report.outputRPM.value).toBe(11.79);
-        expect(report.powerKW.value).toBeCloseTo(108.02, 1);
+        // Ratio = 123 (3 stages -> eff = 0.97^3 = 0.912673)
+        // Correct Input Power = (87500 * 11.79 * 2pi/60) / 0.912673 = 118.369 kW
+        expect(report.powerKW.value).toBeCloseTo(118.37, 1);
       });
 
       describe('Sizing Calculation Completeness and Symmetrical Resolve Tests', () => {
@@ -726,8 +735,10 @@ Output Torque: 4890 Nm`;
           const report = generateAuditReport(rawText, {});
           expect(report.powerKW.value).toBe(22);
           expect(report.inputRPM.value).toBe(1450);
-          expect(report.outputRPM.value).toBeCloseTo(42.96, 1);
-          expect(report.totalRatio.value).toBeCloseTo(33.74, 1);
+          // Correct Output RPM using 1-stage fallback: (22000 * 0.97) / 4890 * (60 / 2pi) = 41.67 RPM
+          expect(report.outputRPM.value).toBeCloseTo(41.67, 1);
+          // Ratio = 1450 / 41.67 = 34.80
+          expect(report.totalRatio.value).toBeCloseTo(34.80, 1);
           expect(report.stages.value).toBe(2);
         });
 
@@ -768,8 +779,10 @@ Output Torque: 4890 Nm`;
           const rawText = `Input\nApplication: Agitator\n\nPower: 22 kW\n\nInput Speed: 24.17 RPS\n\nOutput Torque: 4890 Nm`;
           const report = generateAuditReport(rawText, {});
           expect(report.inputRPM.value).toBeCloseTo(1450.2, 1);
-          expect(report.totalRatio.value).toBeCloseTo(33.7, 0);
-          expect(report.outputRPM.value).toBeCloseTo(43, 0);
+          // Correct Output RPM = (22000 * 0.97) / 4890 * (60 / 2pi) = 41.67 RPM
+          // Ratio = 1450.2 / 41.67 = 34.80
+          expect(report.totalRatio.value).toBeCloseTo(34.8, 0);
+          expect(report.outputRPM.value).toBeCloseTo(42, 0);
         });
 
         it('should handle Test Case 7 - Ambiguous Unit Detection', () => {
@@ -787,9 +800,11 @@ Output Torque: 4890 Nm`;
           const report = generateAuditReport(rawText, {});
           expect(report.powerKW.value).toBeCloseTo(18.64, 1);
           expect(report.inputRPM.value).toBeCloseTo(1450.2, 1);
-          expect(report.extractedEngineeringParams!.outputTorqueNm?.value).toBeCloseTo(4413, 0);
-          expect(report.totalRatio.value).toBeCloseTo(36, 0);
-          expect(report.outputRPM.value).toBeCloseTo(40, 0);
+          expect(report.extractedEngineeringParams!.outputTorqueNm?.value).toBeCloseTo(4414.5, 0);
+          // Output RPM = (18642.5 * 0.97) / 4413 * (60 / 2pi) = 39.13 RPM
+          // Ratio = 1450.2 / 39.13 = 37.06
+          expect(report.totalRatio.value).toBeCloseTo(37.1, 0);
+          expect(report.outputRPM.value).toBeCloseTo(39, 0);
         });
 
         it('should snap to motor poles from resolved input RPM when not explicitly provided', () => {
@@ -800,6 +815,312 @@ Output Torque: 4890 Nm`;
           expect(report.inputRPM.value).toBe(1000);
           expect(report.motorPoles.value).toBe(6);
           expect(report.motorPoles.type).toBe('DERIVED');
+        });
+
+        it('should perform proper power unit conversion for Watts, kW, and HP under different input formats', () => {
+          // 1. HP input formatted as "15 HP motor"
+          const reportHP = generateAuditReport(
+            'Mixer Application. 15 HP motor. Input speed 1450 RPM. Ratio 50.',
+            {}
+          );
+          // 15 HP = 15 * 0.7457 = 11.1855 kW
+          expect(reportHP.powerKW.value).toBeCloseTo(11.1855, 3);
+          expect(reportHP.motorHP.value).toBeCloseTo(15, 2);
+
+          // 2. Watts input formatted as "15000 W motor"
+          const reportW = generateAuditReport(
+            'Mixer Application. 15000 W motor. Input speed 1450 RPM. Ratio 50.',
+            {}
+          );
+          expect(reportW.powerKW.value).toBeCloseTo(15, 3);
+          expect(reportW.motorHP.value).toBeCloseTo(20.115, 3); // 15 / 0.7457 = 20.115 HP
+
+          // 3. kW input formatted as "15 kW motor"
+          const reportKW = generateAuditReport(
+            'Mixer Application. 15 kW motor. Input speed 1450 RPM. Ratio 50.',
+            {}
+          );
+          expect(reportKW.powerKW.value).toBeCloseTo(15, 3);
+
+          // 4. Power range with Watts "5000-8000 W motor"
+          const reportWRange = generateAuditReport(
+            'Mixer Application. Power = 5000-8000 W. Input speed 1450 RPM. Ratio 50.',
+            {}
+          );
+          // Resolved via 1/3 rule: 5000 + (8000 - 5000) / 3 = 6000 W = 6 kW
+          expect(reportWRange.powerKW.value).toBeCloseTo(6.0, 3);
+        });
+
+        it('should correctly apply efficiency to derived power, torque, and speed from output-side vs input-side', () => {
+          // 1. Output Torque & Output RPM -> Input Power (Output-side derivation)
+          // Tout = 9550 Nm, Nout = 6.25 RPM. stages = 2 (so default efficiency = 0.97^2 = 0.9409)
+          // P_out = 9550 * (6.25 * 2pi / 60) = 6250.83 W = 6.25 kW
+          // P_in = P_out / efficiency = 6.25 kW / 0.9409 = 6.643 kW
+          const reportOut = generateAuditReport(
+            'Mixer Application. Output Torque = 9550 Nm. Output Speed = 6.25 RPM. Ratio = 50.',
+            {}
+          );
+          // Stages derived from Ratio = 50:1 -> 2 stages (eff = 0.97^2 = 0.9409)
+          expect(reportOut.powerKW.value).toBeCloseTo(6.643, 2);
+
+          // 2. Input Torque & Input RPM -> Input Power -> Output Torque (Sizing calculations propagation)
+          // Tin = 95.5 Nm, Nin = 1000 RPM. Ratio = 10. stages = 1 (so default efficiency = 0.97)
+          // P_in = 95.5 * 1000 * 2pi / 60 = 10000 W = 10 kW.
+          // Tout = Tin * Ratio * eff = 95.5 * 10 * 0.97 = 926.35 Nm.
+          const reportIn = generateAuditReport(
+            'Mixer Application. Input Torque = 95.5 Nm. Input Speed = 1000 RPM. Ratio = 10.',
+            {}
+          );
+          expect(reportIn.powerKW.value).toBeCloseTo(10, 1);
+          expect(reportIn.outputTorqueNm?.value).toBeCloseTo(926.35, 1);
+        });
+
+        it('should verify Handbook Sizing Audit Case 1 to 7', () => {
+          // Test Case 1: Output Torque & Speed -> Input Power
+          const tc1 = generateAuditReport(
+            'Mixer Application. Output Torque = 94000 Nm. Output Speed = 6.25 RPM. Ratio = 160. Stages = 3.',
+            {}
+          );
+          // Pout = (94000 * 2pi * 6.25) / 60000 = 61.52285 kW
+          // Pin = Pout / (0.97^3) = 61.52285 / 0.912673 = 67.4095 kW
+          expect(tc1.powerKW.value).toBeCloseTo(67.409, 2);
+
+          // Test Case 2: Input Power -> Output Torque
+          const tc2 = generateAuditReport(
+            'Mixer Application. Power = 67.4087 kW. Output Speed = 6.25 RPM. Ratio = 160. Stages = 3.',
+            {}
+          );
+          // Tout = (Pin * eff * 60000) / (2pi * OutputRPM)
+          // Tout = (67.4087 * 0.912673 * 60000) / (2pi * 6.25) = 93998.85 Nm
+          expect(tc2.outputTorqueNm?.value).toBeCloseTo(93998.85, 1);
+
+          // Test Case 3: Input Torque -> Output Torque
+          const tc3 = generateAuditReport(
+            'Mixer Application. Input Torque = 537.14793 Nm. Ratio = 160. Stages = 3.',
+            {}
+          );
+          // Tout = Tin * Ratio * eff = 537.14793 * 160 * 0.912673 = 78438.48 Nm
+          expect(tc3.outputTorqueNm?.value).toBeCloseTo(78438.48, 1);
+
+          // Test Case 4: Reverse Verification (Output Torque -> Input Torque)
+          const tc4 = generateAuditReport(
+            'Mixer Application. Output Torque = 78438.48 Nm. Ratio = 160. Stages = 3.',
+            {}
+          );
+          // Tin = Tout / (Ratio * eff) = 78438.48 / (160 * 0.912673) = 537.14793 Nm
+          expect(tc4.inputTorque?.result).toBeCloseTo(537.14793, 2);
+
+          // Test Case 5: Round Trip Audit
+          // Input Torque -> Input Power -> Output Torque -> Output Power -> Input Power -> Input Torque
+          const tc5 = generateAuditReport(
+            'Mixer Application. Input Torque = 537.14793 Nm. Input Speed = 1000 RPM. Ratio = 160. Stages = 3.',
+            {}
+          );
+          expect(tc5.inputTorque?.result).toBeCloseTo(537.14793, 2);
+
+          // Test Case 6: Detect Double Efficiency Application
+          // Engine must NOT produce 56.1507 kW (which is Output Power * eff)
+          const tc6 = generateAuditReport(
+            'Mixer Application. Output Torque = 94000 Nm. Output Speed = 6.25 RPM. Ratio = 160. Stages = 3.',
+            {}
+          );
+          expect(tc6.powerKW.value).not.toBeCloseTo(56.1507, 2);
+          expect(tc6.powerKW.value).toBeCloseTo(67.409, 2);
+
+          // Test Case 7: Real Paddle Feeder RFQ
+          const tc7 = generateAuditReport(
+            'Mixer Application. Power = 900 kW. Input Speed = 1000 RPM. Ratio = 160. Stages = 3.',
+            {}
+          );
+          // Input Torque = (900 * 60000) / (2pi * 1000) = 8594.3669 Nm
+          // Output Torque = 8594.3669 * 160 * 0.912673 = 1255015.46 Nm
+          // Output RPM = 1000 / 160 = 6.25 RPM
+          expect(tc7.inputTorque?.result).toBeCloseTo(8594.3669, 2);
+          expect(tc7.outputTorqueNm?.value).toBeCloseTo(1255015.46, 1);
+          expect(tc7.outputRPM.value).toBeCloseTo(6.25, 2);
+
+          // Test Case 1 – Belt Conveyor Load Power
+          const tc1_new = generateAuditReport(
+            'Conveyor application. Belt Pull = 50000 N. Belt Speed = 2 m/s. Ratio = 160. Stages = 3.',
+            { numberOfStages: 3 }
+          );
+          expect(tc1_new.outputPowerKW?.value).toBeCloseTo(100.000000, 2);
+          expect(tc1_new.powerKW.value).toBeCloseTo(109.569592, 2);
+          expect(tc1_new.powerSide).toBe('OUTPUT');
+
+          // Test Case 2 – Hoist Load Power
+          const tc2_new = generateAuditReport(
+            'Crane application. Hoist Load = 10000 kg. Hoist Speed = 0.5 m/s. Ratio = 160. Stages = 3.',
+            { numberOfStages: 3 }
+          );
+          expect(tc2_new.outputPowerKW?.value).toBeCloseTo(49.050000, 2);
+          expect(tc2_new.powerKW.value).toBeCloseTo(53.742084, 2);
+          expect(tc2_new.powerSide).toBe('OUTPUT');
+
+          // Test Case 3 – Line Pull Application
+          const tc3_new = generateAuditReport(
+            'Winch application. Line Pull = 120000 N. Travel Speed = 0.8 m/s. Ratio = 160. Stages = 2.',
+            { numberOfStages: 2 }
+          );
+          expect(tc3_new.outputPowerKW?.value).toBeCloseTo(96.000000, 2);
+          expect(tc3_new.powerKW.value).toBeCloseTo(102.029971, 2);
+          expect(tc3_new.powerSide).toBe('OUTPUT');
+
+          // Test Case 4 – Bucket Elevator
+          const tc4_new = generateAuditReport(
+            'Bucket Elevator. Capacity = 150 TPH. Lift Height = 35 m. Ratio = 160. Stages = 3.',
+            { numberOfStages: 3 }
+          );
+          expect(tc4_new.outputPowerKW?.value).toBeCloseTo(14.306250, 2);
+          expect(tc4_new.powerKW.value).toBeCloseTo(15.674836, 2);
+          expect(tc4_new.powerSide).toBe('OUTPUT');
+
+          // Test Case 5 – Reverse Validation
+          const tc5_new = generateAuditReport(
+            'Mixer Application. Power = 109.569592 kW. Ratio = 160. Stages = 3.',
+            { numberOfStages: 3 }
+          );
+          expect(tc5_new.outputPowerKW?.value).toBeCloseTo(100.000000, 2);
+
+          // Test Case 6 – High Power Boundary
+          const tc6_new = generateAuditReport(
+            'Conveyor application. Belt Pull = 250000 N. Belt Speed = 4 m/s. Ratio = 160. Stages = 4.',
+            { numberOfStages: 4 }
+          );
+          expect(tc6_new.outputPowerKW?.value).toBeCloseTo(1000.000000, 2);
+          expect(tc6_new.powerKW.value).toBeCloseTo(1129.569823, 2);
+
+          // Test Case 7 – Gearbox Selection Boundary
+          const tc7_new = generateAuditReport(
+            'Conveyor application. Belt Pull = 45000 N. Belt Speed = 2 m/s. Ratio = 160. Stages = 3.',
+            { numberOfStages: 3 }
+          );
+          expect(tc7_new.outputPowerKW?.value).toBeCloseTo(90.000000, 2);
+          expect(tc7_new.powerKW.value).toBeCloseTo(98.612633, 2);
+          expect(tc7_new.overallOutputTorque).toBeCloseTo(95493.0, -1);
+
+          // Test Case 8 – Round Trip Accuracy
+          const tc8_new = generateAuditReport(
+            'Conveyor application. Belt Pull = 50000 N. Belt Speed = 2 m/s. Ratio = 160. Stages = 3.',
+            { numberOfStages: 3 }
+          );
+          const expectedOut = 100.000000;
+          const actualOut = tc8_new.outputPowerKW?.value || 0;
+          const percentageError = Math.abs(actualOut - expectedOut) / expectedOut * 100;
+          expect(percentageError).toBeLessThan(0.0001);
+        });
+
+        it('should trigger Engineering Consistency Validation for conflicting power, speed, and torque', () => {
+          // Input speed = 1000 RPM, Power = 100 kW.
+          // Correct torque = (100 * 60000) / (2 * pi * 1000) = 954.9 N.m.
+          // Extracted torque = 500 N.m (Conflict: 47.6% deviation, > 5%)
+          const report = generateAuditReport(
+            'Mixer Application. Power = 100 kW. Input Speed = 1000 RPM. Input Torque = 500 Nm. Ratio = 10. Stages = 1.',
+            {}
+          );
+          
+          // Verify consistency conflict is raised
+          expect(report.validation.isValid).toBe(false);
+          const consistencyItem = report.validation.items.find(i => i.name === 'Input Torque Consistency');
+          expect(consistencyItem).toBeDefined();
+          expect(consistencyItem!.status).toBe('❌ Invalid');
+          expect(consistencyItem!.message).toContain('Engineering Consistency Warning');
+          expect(consistencyItem!.message).toContain('deviates by 91.0%');
+          
+          // Verify torque value is overridden with recomputed value
+          expect(report.inputTorqueNm?.value).toBeCloseTo(954.929658, 2);
+          expect(report.inputTorqueNm?.reasoning).toContain('⚠ Engineering Consistency Warning');
+          
+          // Verify mismatch metadata is populated
+          expect(report.inputTorqueNm?.mismatch).toBeDefined();
+          expect(report.inputTorqueNm?.mismatch?.isMismatch).toBe(true);
+          expect(report.inputTorqueNm?.mismatch?.extractedValue).toBe(500);
+          expect(report.inputTorqueNm?.mismatch?.calculatedValue).toBeCloseTo(954.929658, 2);
+          expect(report.inputTorqueNm?.mismatch?.deviationPercentage).toBeCloseTo(90.9859, 1);
+        });
+
+        it('should trigger speed consistency mismatch warning', () => {
+          const report = generateAuditReport(
+            'Mixer. Input Speed = 1000 RPM. Ratio = 10. Output Speed = 50 RPM. Power = 10 kW.',
+            {}
+          );
+          expect(report.validation.isValid).toBe(false);
+          const mismatch = report.validation.mismatches?.find(m => m.propertyName === 'Output RPM');
+          expect(mismatch).toBeDefined();
+          expect(mismatch?.severity).toBe('Critical');
+          expect(mismatch?.deviationPercentage).toBeCloseTo(100.0, 1);
+        });
+
+        it('should trigger ratio consistency mismatch warning', () => {
+          const report = generateAuditReport(
+            'Conveyor. Input Speed = 1000 RPM. Output Speed = 100 RPM. Ratio = 5:1. Power = 10 kW.',
+            {}
+          );
+          expect(report.validation.isValid).toBe(false);
+          const mismatch = report.validation.mismatches?.find(m => m.propertyName === 'Total Ratio');
+          expect(mismatch).toBeDefined();
+          expect(mismatch?.deviationPercentage).toBeCloseTo(100.0, 1);
+        });
+
+        it('should trigger power consistency mismatch warning', () => {
+          const report = generateAuditReport(
+            'Fan. Input Speed = 1000 RPM. Input Torque = 954.9 Nm. Power = 50 kW. Ratio = 10.',
+            {}
+          );
+          expect(report.validation.isValid).toBe(false);
+          const mismatch = report.validation.mismatches?.find(m => m.propertyName === 'Power');
+          expect(mismatch).toBeDefined();
+          expect(mismatch?.deviationPercentage).toBeCloseTo(99.98, 1);
+        });
+
+        it('should trigger Motor HP consistency mismatch warning', () => {
+          const report = generateAuditReport(
+            'Pump. Input Speed = 1500 RPM. Power = 74.57 kW. Motor HP = 50 HP. Ratio = 15.',
+            {}
+          );
+          expect(report.validation.isValid).toBe(false);
+          const mismatch = report.validation.mismatches?.find(m => m.propertyName === 'Motor HP');
+          expect(mismatch).toBeDefined();
+          expect(mismatch?.deviationPercentage).toBeCloseTo(100.0, 1);
+        });
+
+        it('should trigger constraint consistency warning when output speed exceeds limit', () => {
+          const report = generateAuditReport(
+            'Winch. Input Speed = 420 RPM. Ratio = 10. Output Speed Limit <= 35 RPM. Power = 10 kW.',
+            {}
+          );
+          expect(report.validation.isValid).toBe(false);
+          const mismatch = report.validation.mismatches?.find(m => m.propertyName === 'Output Speed Max Limit');
+          expect(mismatch).toBeDefined();
+          expect(mismatch?.severity).toBe('Constraint');
+          expect(mismatch?.message).toContain('exceeds user-specified maximum limit');
+        });
+
+        it('should correctly convert kNm torque to SI unit (Nm)', () => {
+          const report = generateAuditReport(
+            'Conveyor. Input Speed = 1000 RPM. Ratio = 100. Power = 20 kW. Output Torque = 15 kNm.',
+            {}
+          );
+          // Specified Output Torque: 15 kNm = 15000 Nm
+          // Calculated Output Torque: Pin * Ratio * eff = 20000 * 100 * 0.91 / (104.7) = 17380 Nm (approx)
+          // Mismatch should exist because 15000 Nm deviates from ~17380 Nm.
+          // If kNm conversion failed, outputTorqueNm would be parsed as 15 Nm, which would cause an extreme deviation mismatch.
+          const mismatch = report.validation.mismatches?.find(m => m.propertyName === 'Output Torque');
+          expect(mismatch).toBeDefined();
+          expect(mismatch?.specifiedValue).toContain('15,000 Nm');
+        });
+
+        it('should correctly convert lb-ft torque to SI unit (Nm)', () => {
+          const report = generateAuditReport(
+            'Drive. Input Speed = 1000 RPM. Ratio = 10. Power = 5 kW. Output Torque = 100 lb-ft.',
+            {}
+          );
+          // 100 lb-ft = 135.58 Nm.
+          // Calculated: Pin * Ratio * eff = 5000 * 10 * 0.94 / 104.7 = 448.9 Nm.
+          // If conversion failed, specifiedValue would be 100.0 N·m.
+          const mismatch = report.validation.mismatches?.find(m => m.propertyName === 'Output Torque');
+          expect(mismatch).toBeDefined();
+          expect(mismatch?.specifiedValue).toContain('135.58');
         });
       });
     });

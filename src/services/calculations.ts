@@ -991,8 +991,8 @@ export class ParameterExtractionEngine {
     //////////////////////////////////////////////////
 
     const powerPatterns = [
-      /(?:Power|Motor\s+Power|Drive\s+Power|Motor\s+Rating|Motor\s+Capacity|Installed\s+Power|Connected\s+Load|Motor|\bPWR\b)\s*(?:is|of|was)?\s*[:=\s]*\s*(\d+(?:\.\d+)?)(?!\d|\.\d)(?!\s*(?:RPM|r\/min|speed|poles?|hz|v|volts?))\s*(kW|HP|Kilowatt|Horsepower|h\.p\.)?/i,
-      /(\d+(?:\.\d+)?)(?!\d|\.\d)\s*(?:kW|HP|Kilowatt|Horsepower|h\.p\.)\s*(?:is|of|was)?\s*[:=\s]*\s*(?:Power|Motor\s+Power|Drive\s+Power|Motor\s+Rating|Motor\s+Capacity|Installed\s+Power|Connected\s+Load|Motor|\bPWR\b)?/i
+      /(?:Power|Motor\s+Power|Drive\s+Power|Motor\s+Rating|Motor\s+Capacity|Installed\s+Power|Connected\s+Load|Motor|\bPWR\b)\s*(?:is|of|was)?\s*[:=\s]*\s*(\d+(?:\.\d+)?)(?!\d|\.\d)(?!\s*(?:RPM|r\/min|speed|poles?|hz|v|volts?))\s*(kW|HP|Kilowatt|Horsepower|h\.p\.|W|Watt|Watts)?/i,
+      /(\d+(?:\.\d+)?)(?!\d|\.\d)\s*(kW|HP|Kilowatt|Horsepower|h\.p\.|W|Watt|Watts)\s*(?:is|of|was)?\s*[:=\s]*\s*(?:Power|Motor\s+Power|Drive\s+Power|Motor\s+Rating|Motor\s+Capacity|Installed\s+Power|Connected\s+Load|Motor|\bPWR\b)?/i
     ];
 
     let powerMatchedVal: number | null = null;
@@ -1021,7 +1021,7 @@ export class ParameterExtractionEngine {
     if (powerMatchedVal !== null) {
       if (powerMatchedUnit === 'hp' || powerMatchedUnit === 'horsepower' || powerMatchedUnit === 'h.p.') {
         result.powerHP = powerMatchedVal;
-      } else if (powerMatchedUnit === 'w' || powerMatchedUnit === 'watts') {
+      } else if (powerMatchedUnit === 'w' || powerMatchedUnit === 'watt' || powerMatchedUnit === 'watts') {
         result.powerW = powerMatchedVal;
       } else {
         result.powerW = powerMatchedVal * 1000; // Default to kW -> W
@@ -1226,7 +1226,7 @@ export class ParameterExtractionEngine {
 
     if (torqueVal !== null) {
       if (torqueUnit === 'kgf') {
-        result.torqueNm = torqueVal * 9.80665;
+        result.torqueNm = torqueVal * 9.81;
       } else if (torqueUnit === 'ftlb') {
         result.torqueNm = torqueVal * 1.35581794833;
       } else if (torqueUnit === 'inlb') {
@@ -1246,7 +1246,7 @@ export class ParameterExtractionEngine {
       if (torqueNmMatch) {
         result.torqueNm = parseFloat(torqueNmMatch[1]);
       } else if (torqueKgfMatch) {
-        result.torqueNm = parseFloat(torqueKgfMatch[1]) * 9.80665;
+        result.torqueNm = parseFloat(torqueKgfMatch[1]) * 9.81;
       } else if (torqueFtLbMatch) {
         result.torqueNm = parseFloat(torqueFtLbMatch[1]) * 1.35581794833;
       } else if (torqueInLbMatch) {
@@ -1293,7 +1293,7 @@ export class ParameterExtractionEngine {
     } else if (axialN) {
       result.axialLoadN = parseFloat(axialN[1]);
     } else if (axialKg) {
-      result.axialLoadN = parseFloat(axialKg[1]) * 9.80665;
+      result.axialLoadN = parseFloat(axialKg[1]) * 9.81;
     } else if (axialLbs) {
       result.axialLoadN = parseFloat(axialLbs[1]) * 4.448221615;
     }
@@ -1371,9 +1371,9 @@ export class ParameterExtractionEngine {
     if (sfCondMatch) {
       const condRaw = sfCondMatch[1].toLowerCase();
       let condition: 'less than' | 'greater than' | 'equal to' | 'minimum' | 'maximum' | null = null;
-      if (condRaw === 'less than' || condRaw === '<' || condRaw === '<=') {
+      if (condRaw === 'less than' || condRaw === '<' || condRaw === '<=' || condRaw === '≤') {
         condition = 'less than';
-      } else if (condRaw === 'greater than' || condRaw === '>' || condRaw === '>=') {
+      } else if (condRaw === 'greater than' || condRaw === '>' || condRaw === '>=' || condRaw === '≥') {
         condition = 'greater than';
       } else if (condRaw === 'equal to' || condRaw === '=') {
         condition = 'equal to';
@@ -1605,7 +1605,18 @@ export class MissingDataResolutionEngine {
     }
 
     if (input.outputTorqueNm && input.outputRadS) {
-      return input.outputTorqueNm * input.outputRadS;
+      let eff = input.efficiency;
+      if (eff === undefined) {
+        let stageCount = 1;
+        if (input.totalRatio) {
+          stageCount = StageCountEngine.determineStageCount(input.totalRatio);
+        } else if (input.inputRadS) {
+          const ratioGuess = input.inputRadS / input.outputRadS;
+          stageCount = StageCountEngine.determineStageCount(ratioGuess);
+        }
+        eff = Math.pow(0.97, stageCount);
+      }
+      return (input.outputTorqueNm * input.outputRadS) / eff;
     }
 
     return undefined;
@@ -1688,7 +1699,18 @@ export class MissingDataResolutionEngine {
 
     const powerW = input.powerW || (input.powerHP ? input.powerHP * 745.7 : undefined);
     if (powerW && input.outputTorqueNm) {
-      return powerW / input.outputTorqueNm;
+      let eff = input.efficiency;
+      if (eff === undefined) {
+        let stageCount = 1;
+        if (input.totalRatio) {
+          stageCount = StageCountEngine.determineStageCount(input.totalRatio);
+        } else if (input.inputRadS) {
+          const ratioGuess = input.inputRadS / (powerW / input.outputTorqueNm);
+          stageCount = StageCountEngine.determineStageCount(ratioGuess);
+        }
+        eff = Math.pow(0.97, stageCount);
+      }
+      return (powerW * eff) / input.outputTorqueNm;
     }
 
     return undefined;
